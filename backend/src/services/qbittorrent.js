@@ -49,12 +49,14 @@ async function login() {
     bypassAuth = false;
     throw new Error(`qBittorrent login failed (${res.status}): check username/password`);
   }
-  // Success. Capture the SID cookie if one was issued; otherwise auth is being
-  // bypassed for our IP, so proceed without a cookie.
+  // Success. Capture whatever session cookie was issued. The name varies by
+  // build — plain `SID`, `QBT_SID`, or port-suffixed `QBT_SID_8080` — so keep
+  // every name=value pair rather than matching one name. If none came back,
+  // auth is being bypassed for our IP, so proceed without a cookie.
   const cookies = res.headers.getSetCookie?.() || [];
-  const sid = cookies.map((c) => c.split(';')[0]).find((c) => c.startsWith('SID='));
-  sidCookie = sid || null;
-  bypassAuth = !sid;
+  const pairs = cookies.map((c) => c.split(';')[0].trim()).filter(Boolean);
+  sidCookie = pairs.length ? pairs.join('; ') : null;
+  bypassAuth = !sidCookie;
   return sidCookie;
 }
 
