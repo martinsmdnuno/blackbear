@@ -1,0 +1,43 @@
+services:
+  blackbeard-api:
+    build: ./backend
+    container_name: blackbeard-api
+    environment:
+      - PORT=3000
+      - CONFIG_PATH=/config/config.json
+      # Optional seeds for the very first run. Once you save settings in the UI,
+      # /config/config.json becomes authoritative and these are ignored.
+      # - SONARR_URL=http://sonarr:8989
+      # - SONARR_API_KEY=
+      # - RADARR_URL=http://radarr:7878
+      # - RADARR_API_KEY=
+      # - PROWLARR_URL=http://prowlarr:9696
+      # - PROWLARR_API_KEY=
+      # - BAZARR_URL=http://bazarr:6767
+      # - BAZARR_API_KEY=
+      # - QBITTORRENT_URL=http://qbittorrent:8080
+      # - QBITTORRENT_USERNAME=admin
+      # - QBITTORRENT_PASSWORD=
+    volumes:
+      - ./config:/config
+      # Needed only for the "Restart container" / "Logs" diagnostics.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - servarr_default
+    restart: unless-stopped
+
+  blackbeard-web:
+    build: ./frontend
+    container_name: blackbeard-web
+    ports:
+      - "8085:80"
+    depends_on:
+      - blackbeard-api
+    networks:
+      - servarr_default
+    restart: unless-stopped
+
+# Join the existing servarr stack network so containers are reachable by name.
+networks:
+  servarr_default:
+    external: true

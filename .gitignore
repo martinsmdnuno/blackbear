@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+
+# Runtime config holds API keys / passwords — never commit it.
+config.json
+config/
+
+*.log
+npm-debug.log*
+.DS_Store
+.env
+.env.*
+.vite/
