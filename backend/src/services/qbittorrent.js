@@ -5,7 +5,10 @@ const TIMEOUT = 12000;
 
 // qBittorrent authenticates with a session cookie (SID) rather than an API key.
 // We log in lazily, cache the cookie, and transparently re-login on a 403.
+// When "Bypass authentication for whitelisted subnets/localhost" is enabled the
+// login can succeed with no cookie (e.g. an empty 204), so we also track that.
 let sidCookie = null;
+let bypassAuth = false;
 
 function base() {
   const cfg = getService('qbittorrent');
@@ -33,20 +36,30 @@ async function login() {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url },
     body: new URLSearchParams({ username, password }).toString()
   });
-  const text = await res.text();
-  if (!res.ok || text.trim() !== 'Ok.') {
+  const text = (await res.text()).trim();
+  // 403 = IP temporarily banned after too many failed attempts.
+  if (res.status === 403) {
     sidCookie = null;
-    throw new Error(`qBittorrent login failed (${res.status}): ${text.slice(0, 100) || 'check username/password'}`);
+    bypassAuth = false;
+    throw new Error('qBittorrent login failed (403): IP banned — wait or restart qBittorrent');
   }
+  // "Fails." is qBittorrent's explicit wrong-credentials marker.
+  if (!res.ok || text === 'Fails.') {
+    sidCookie = null;
+    bypassAuth = false;
+    throw new Error(`qBittorrent login failed (${res.status}): check username/password`);
+  }
+  // Success. Capture the SID cookie if one was issued; otherwise auth is being
+  // bypassed for our IP, so proceed without a cookie.
   const cookies = res.headers.getSetCookie?.() || [];
   const sid = cookies.map((c) => c.split(';')[0]).find((c) => c.startsWith('SID='));
-  if (!sid) throw new Error('qBittorrent login did not return a session cookie');
-  sidCookie = sid;
+  sidCookie = sid || null;
+  bypassAuth = !sid;
   return sidCookie;
 }
 
 async function ensureSession() {
-  if (!sidCookie) await login();
+  if (!sidCookie && !bypassAuth) await login();
   return sidCookie;
 }
 
@@ -54,7 +67,8 @@ async function ensureSession() {
 async function call(path, { method = 'GET', form } = {}, retry = true) {
   const { url } = base();
   await ensureSession();
-  const headers = { Cookie: sidCookie, Referer: url };
+  const headers = { Referer: url };
+  if (sidCookie) headers.Cookie = sidCookie;
   let body;
   if (form) {
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
@@ -63,6 +77,7 @@ async function call(path, { method = 'GET', form } = {}, retry = true) {
   const res = await fetchWithTimeout(`${url}${path}`, { method, headers, body });
   if (res.status === 403 && retry) {
     sidCookie = null;
+    bypassAuth = false;
     return call(path, { method, form }, false);
   }
   if (!res.ok) {
