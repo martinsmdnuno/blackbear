@@ -11,6 +11,8 @@ export const rootFolders = () => client.get('/rootfolder');
 
 export const addMovie = (payload) => client.post('/movie', payload);
 
+export const allMovies = () => client.get('/movie');
+
 export const queue = () => client.get('/queue?pageSize=100');
 
 export const systemStatus = () => client.get('/system/status');

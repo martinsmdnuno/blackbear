@@ -11,6 +11,8 @@ export const rootFolders = () => client.get('/rootfolder');
 
 export const addSeries = (payload) => client.post('/series', payload);
 
+export const allSeries = () => client.get('/series');
+
 export const queue = () =>
   client.get('/queue?includeUnknownSeriesItems=true&pageSize=100');
 

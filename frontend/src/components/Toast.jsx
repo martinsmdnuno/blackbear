@@ -40,7 +40,10 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="fixed inset-x-0 top-3 z-50 flex flex-col items-center gap-2 px-3 pointer-events-none">
+      <div
+        className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-3 pointer-events-none"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
+      >
         {toasts.map((t) => {
           const Icon = icons[t.type];
           return (

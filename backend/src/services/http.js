@@ -29,9 +29,31 @@ export async function httpRequest(url, options = {}) {
     } catch {
       // ignore body read errors
     }
-    throw new Error(`${label} responded ${res.status} ${res.statusText}${body ? `: ${body.slice(0, 200)}` : ''}`);
+    throw new Error(formatHttpError(label, res.status, body));
   }
   return res;
+}
+
+// Turn an error response body into a readable message. Sonarr/Radarr return a
+// JSON array of validation errors ([{ propertyName, errorMessage, ... }]); other
+// services may return { message } or { error }. Fall back to trimmed raw text.
+function formatHttpError(label, status, body) {
+  let detail = (body || '').trim();
+  if (detail) {
+    try {
+      const json = JSON.parse(detail);
+      if (Array.isArray(json)) {
+        const msgs = json.map((e) => e.errorMessage || e.message).filter(Boolean);
+        if (msgs.length) detail = msgs.join('; ');
+      } else if (json && typeof json === 'object') {
+        detail = json.errorMessage || json.message || json.error || detail;
+      }
+    } catch {
+      // not JSON — keep the raw text
+    }
+  }
+  detail = detail.replace(/\s+/g, ' ').slice(0, 300);
+  return `${label} ${status}${detail ? `: ${detail}` : ''}`;
 }
 
 export async function httpJson(url, options = {}) {

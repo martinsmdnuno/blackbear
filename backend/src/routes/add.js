@@ -82,8 +82,44 @@ router.post('/', async (req, res) => {
     const added = await sonarr.addSeries(payload);
     return res.status(201).json(added);
   } catch (err) {
-    res.status(502).json({ error: err.message });
+    const { status, error } = await humanizeAddError(type, item, err.message || '');
+    res.status(status).json({ error });
   }
 });
+
+// Translate the raw *arr validation errors into something a human can act on,
+// and — for the common "folder already in use" case — name the existing title.
+async function humanizeAddError(type, item, message) {
+  const kind = type === 'movie' ? 'Radarr' : 'Sonarr';
+  const lib = type === 'movie' ? 'Movies' : 'Series';
+  const title = item?.title || 'This title';
+
+  if (/already configured for another (series|movie)/i.test(message)) {
+    const path = (message.match(/Path ['"]?(.+?)['"]? is already/i) || [])[1];
+    try {
+      const existing = type === 'movie' ? await radarr.allMovies() : await sonarr.allSeries();
+      const hit = path ? (existing || []).find((x) => x.path === path) : null;
+      if (hit) {
+        const mon = hit.monitored === false ? ', not monitored' : '';
+        return {
+          status: 409,
+          error: `Already in ${kind} as “${hit.title}”${mon}. The folder ${path} is taken, so it can't be added twice — open ${kind} → ${lib} to manage it.`
+        };
+      }
+    } catch {
+      // couldn't look it up — fall back to the generic message below
+    }
+    return {
+      status: 409,
+      error: `That folder${path ? ` (${path})` : ''} is already used by another title in ${kind}, so ${title} can't be added again. Open ${kind} → ${lib} to find it.`
+    };
+  }
+
+  if (/already been added|already exists/i.test(message)) {
+    return { status: 409, error: `${title} is already in ${kind}.` };
+  }
+
+  return { status: 502, error: `${kind} couldn't add ${title} — ${message}` };
+}
 
 export default router;
