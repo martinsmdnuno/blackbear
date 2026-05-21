@@ -12,11 +12,17 @@ Three areas:
 
 1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
    monitor options.
-2. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
+2. **Upcoming** — monitored titles awaiting release: movies with their digital/physical/
+   cinema dates and series episodes by air date, each with an "in X days" countdown
+   (from the Radarr/Sonarr calendars).
+3. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
    Bazarr wanted-subtitle counts, auto-refreshing every 5s.
-3. **Settings & Diagnostics** — configure each service, test connections, and inspect
+4. **Settings & Diagnostics** — configure each service, test connections, and inspect
    health, versions, disk space, indexer status, providers, health warnings, container
    logs and restart controls.
+
+Mobile-first and installable: open it on your phone and **Add to Home Screen** to run
+it fullscreen like a native app (PWA manifest, no input-focus zoom, no overscroll bounce).
 
 ---
 
@@ -171,6 +177,12 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 | POST   | `/api/downloads/torrents/:hash/pause`           | Pause a torrent                      |
 | POST   | `/api/downloads/torrents/:hash/resume`          | Resume a torrent                     |
 | DELETE | `/api/downloads/torrents/:hash?deleteFiles=...` | Remove a torrent (optionally files)  |
+
+### Upcoming
+
+| Method | Path                                              | Purpose                                          |
+|--------|---------------------------------------------------|--------------------------------------------------|
+| GET    | `/api/pipeline?movieDays=365&episodeDays=90`      | Monitored, not-yet-available movies + episodes from the Radarr/Sonarr calendars, sorted by date |
 
 ### Settings
 

@@ -22,6 +22,8 @@ export const api = {
   rootFolders: (type) => req(`/add/root-folders?type=${type}`),
   add: (payload) => req('/add', { method: 'POST', body: JSON.stringify(payload) }),
 
+  pipeline: () => req('/pipeline'),
+
   downloads: () => req('/downloads'),
   torrentPause: (hash) => req(`/downloads/torrents/${hash}/pause`, { method: 'POST' }),
   torrentResume: (hash) => req(`/downloads/torrents/${hash}/resume`, { method: 'POST' }),

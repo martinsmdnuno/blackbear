@@ -31,3 +31,26 @@ export function truncate(str, max = 60) {
   if (!str) return '';
   return str.length > max ? `${str.slice(0, max - 1)}…` : str;
 }
+
+// "in 3 days", "tomorrow", "today", or "2 weeks ago" for a date string.
+export function untilLabel(dateStr) {
+  if (!dateStr) return '';
+  const days = Math.round((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  if (days < -1) return `${Math.abs(days)} days ago`;
+  if (days === -1) return 'yesterday';
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days < 7) return `in ${days} days`;
+  if (days < 30) return `in ${Math.round(days / 7)} weeks`;
+  if (days < 365) return `in ${Math.round(days / 30)} months`;
+  return `in ${Math.round(days / 365)} years`;
+}
+
+export function shortDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}

@@ -19,4 +19,7 @@ export const health = () => client.get('/health');
 
 export const diskSpace = () => client.get('/diskspace');
 
+export const calendar = (start, end) =>
+  client.get(`/calendar?start=${start}&end=${end}&unmonitored=false`);
+
 export default client;

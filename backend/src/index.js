@@ -4,6 +4,7 @@ import { loadConfig, CONFIG_PATH } from './config.js';
 import searchRoutes from './routes/search.js';
 import addRoutes from './routes/add.js';
 import downloadsRoutes from './routes/downloads.js';
+import pipelineRoutes from './routes/pipeline.js';
 import settingsRoutes from './routes/settings.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
 
@@ -20,6 +21,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', app: 'blackbeard'
 app.use('/api/search', searchRoutes);
 app.use('/api/add', addRoutes);
 app.use('/api/downloads', downloadsRoutes);
+app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/diagnostics', diagnosticsRoutes);
 

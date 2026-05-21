@@ -18,4 +18,7 @@ export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');
 
+export const calendar = (start, end) =>
+  client.get(`/calendar?start=${start}&end=${end}&unmonitored=false&includeSeries=true`);
+
 export default client;
