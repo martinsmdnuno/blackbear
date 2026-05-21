@@ -5,9 +5,26 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-night-900 text-parchment font-sans antialiased;
+    /* Native-app feel: no rubber-band overscroll, no long-press callout. */
+    overscroll-behavior: none;
+    -webkit-touch-callout: none;
+  }
+}
+
+/* iOS zooms when a focused field is < 16px. Keep form controls at 16px on
+   phones so focusing an input never triggers a zoom. Unlayered so it beats the
+   `.input { text-sm }` defined in @layer components. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea,
+  .input {
+    font-size: 16px;
   }
 }
 
