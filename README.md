@@ -1,8 +1,12 @@
-# 🏴‍☠️ BlackBeard
+# 🐻‍⬛ Blackbear — Home Server Download Manager
 
-A mobile-first web app to command your home media server from your phone. BlackBeard
+A mobile-first web app to command your home media server from your phone. Blackbear
 is a single dark-themed interface that aggregates the features scattered across the
 servarr stack (Sonarr, Radarr, Prowlarr, Bazarr, qBittorrent) running in Docker.
+
+> Brand: a black-bear pirate captain. Deep-sea-blue + midnight-black UI with treasure-gold
+> accents and mutiny-red for destructive actions; display type in Pirata One, data in Inter.
+> Docker service/container names stay `blackbeard-*` for continuity with the running stack.
 
 Three areas:
 
@@ -193,7 +197,7 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 - **No auth.** Intended for the LAN, to live behind Tailscale later. Auth is a v2 item.
 - **Resilient by design.** If a service is offline or misconfigured, its panel shows an
   error but the rest of the app keeps working — one dead Prowlarr won't sink the ship.
-- **qBittorrent 5.0** renamed `pause`/`resume` to `stop`/`start`; BlackBeard tries the new
+- **qBittorrent 5.0** renamed `pause`/`resume` to `stop`/`start`; Blackbear tries the new
   endpoints and falls back to the old ones automatically.
 
 *Yo ho ho and a bottle of rum.* 🏴‍☠️

@@ -29,7 +29,7 @@ const SERIES_TYPE = [
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-silver">
         {label}
       </span>
       {children}
@@ -44,7 +44,7 @@ function Toggle({ checked, onChange, label }) {
       onClick={() => onChange(!checked)}
       className="flex w-full items-center justify-between rounded-xl bg-night-900 px-3 py-2.5"
     >
-      <span className="text-sm text-slate-200">{label}</span>
+      <span className="text-sm text-parchment">{label}</span>
       <span
         className={`relative h-6 w-11 rounded-full transition ${
           checked ? 'bg-gold' : 'bg-night-700'
@@ -135,18 +135,18 @@ export default function AddSheet({ type, item, onClose }) {
             <img src={poster} alt="" className="h-24 w-16 shrink-0 rounded-lg object-cover" />
           )}
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-lg font-bold text-slate-100">{item.title}</h3>
-            <p className="text-sm text-slate-400">
+            <h3 className="truncate text-lg font-bold text-parchment">{item.title}</h3>
+            <p className="text-sm text-silver">
               {item.year || '—'} · {isMovie ? 'Movie' : 'Series'}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-slate-200">
+          <button onClick={onClose} className="rounded-lg p-1 text-silver hover:text-parchment">
             <X size={20} />
           </button>
         </div>
 
         {loadingMeta ? (
-          <div className="mt-6 flex items-center gap-2 text-sm text-slate-400">
+          <div className="mt-6 flex items-center gap-2 text-sm text-silver">
             <Loader2 size={16} className="animate-spin" /> Loading profiles…
           </div>
         ) : metaError ? (

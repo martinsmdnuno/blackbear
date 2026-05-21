@@ -52,7 +52,7 @@ export function ToastProvider({ children }) {
                           animate-fade-in ${styles[t.type]}`}
             >
               <Icon size={18} className="mt-0.5 shrink-0" />
-              <span className="text-slate-200">{t.message}</span>
+              <span className="text-parchment">{t.message}</span>
             </div>
           );
         })}

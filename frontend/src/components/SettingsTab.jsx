@@ -53,7 +53,7 @@ function ServiceForm({ name, value, onChange }) {
   return (
     <div className="card space-y-3 p-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-slate-100">{SERVICE_LABELS[name]}</h3>
+        <h3 className="font-bold text-parchment">{SERVICE_LABELS[name]}</h3>
         {result &&
           (result.ok ? (
             <CheckCircle2 size={18} className="text-emerald-400" />
@@ -63,7 +63,7 @@ function ServiceForm({ name, value, onChange }) {
       </div>
 
       <label className="block">
-        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
           URL
         </span>
         <input
@@ -77,7 +77,7 @@ function ServiceForm({ name, value, onChange }) {
       {isQbit ? (
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
               Username
             </span>
             <input
@@ -87,7 +87,7 @@ function ServiceForm({ name, value, onChange }) {
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
               Password
             </span>
             <input
@@ -101,7 +101,7 @@ function ServiceForm({ name, value, onChange }) {
         </div>
       ) : (
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
             API Key
           </span>
           <input
@@ -115,7 +115,7 @@ function ServiceForm({ name, value, onChange }) {
       )}
 
       <label className="block">
-        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
           Container name (for restart/logs)
         </span>
         <input
@@ -219,19 +219,19 @@ function LogsModal({ service, onClose }) {
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
       <div className="card relative z-10 flex h-[80vh] w-full max-w-2xl flex-col p-4">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="font-bold text-slate-100">{SERVICE_LABELS[service]} — logs</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+          <h3 className="font-bold text-parchment">{SERVICE_LABELS[service]} — logs</h3>
+          <button onClick={onClose} className="text-silver hover:text-parchment">
             <X size={20} />
           </button>
         </div>
         {error ? (
           <p className="text-sm text-blood-light">{error}</p>
         ) : logs == null ? (
-          <div className="flex flex-1 items-center justify-center text-slate-400">
+          <div className="flex flex-1 items-center justify-center text-silver">
             <Loader2 className="animate-spin" />
           </div>
         ) : (
-          <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-night-950 p-3 text-[11px] leading-relaxed text-slate-300">
+          <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-night-950 p-3 text-[11px] leading-relaxed text-parchment/90">
             {logs}
           </pre>
         )}
@@ -248,8 +248,8 @@ function HealthRow({ h }) {
       ) : (
         <XCircle size={18} className="shrink-0 text-blood-light" />
       )}
-      <span className="font-semibold text-slate-200">{SERVICE_LABELS[h.service]}</span>
-      <span className="ml-auto truncate text-xs text-slate-400">
+      <span className="font-semibold text-parchment">{SERVICE_LABELS[h.service]}</span>
+      <span className="ml-auto truncate text-xs text-silver">
         {h.ok ? (h.version ? `v${h.version}` : 'online') : h.error}
       </span>
     </div>
@@ -321,7 +321,7 @@ function DiagnosticsPanel() {
 
       {/* Health */}
       <section className="card space-y-2 p-4">
-        <h3 className="flex items-center gap-2 font-bold text-slate-100">
+        <h3 className="flex items-center gap-2 font-bold text-parchment">
           <Stethoscope size={18} className="text-gold" /> Service Health
         </h3>
         {data.health.map((h) => (
@@ -331,19 +331,19 @@ function DiagnosticsPanel() {
 
       {/* Disk space */}
       <section className="card space-y-3 p-4">
-        <h3 className="flex items-center gap-2 font-bold text-slate-100">
+        <h3 className="flex items-center gap-2 font-bold text-parchment">
           <HardDrive size={18} className="text-gold" /> Disk Space
         </h3>
         {data.diskSpace.error ? (
           <p className="text-xs text-blood-light">{data.diskSpace.error}</p>
         ) : data.diskSpace.items.length === 0 ? (
-          <p className="text-sm text-slate-500">No data.</p>
+          <p className="text-sm text-silver">No data.</p>
         ) : (
           data.diskSpace.items.map((d) => {
             const used = d.totalSpace ? (d.totalSpace - d.freeSpace) / d.totalSpace : 0;
             return (
               <div key={d.path}>
-                <div className="flex justify-between text-xs text-slate-400">
+                <div className="flex justify-between text-xs text-silver">
                   <span className="truncate">{d.label || d.path}</span>
                   <span>
                     {bytes(d.freeSpace)} free / {bytes(d.totalSpace)}
@@ -351,7 +351,7 @@ function DiagnosticsPanel() {
                 </div>
                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-night-800">
                   <div
-                    className={`h-full rounded-full ${used > 0.9 ? 'bg-blood' : 'bg-gold'}`}
+                    className={`h-full rounded-full ${used > 0.9 ? 'bg-blood' : 'progress-gold'}`}
                     style={{ width: `${Math.round(used * 100)}%` }}
                   />
                 </div>
@@ -363,23 +363,23 @@ function DiagnosticsPanel() {
 
       {/* Indexers */}
       <section className="card space-y-2 p-4">
-        <h3 className="flex items-center gap-2 font-bold text-slate-100">
+        <h3 className="flex items-center gap-2 font-bold text-parchment">
           <Radio size={18} className="text-gold" /> Prowlarr Indexers
         </h3>
         {data.indexers.error ? (
           <p className="text-xs text-blood-light">{data.indexers.error}</p>
         ) : data.indexers.items.length === 0 ? (
-          <p className="text-sm text-slate-500">No indexers.</p>
+          <p className="text-sm text-silver">No indexers.</p>
         ) : (
           data.indexers.items.map((idx) => (
             <div key={idx.id} className="flex items-center gap-2 rounded-lg bg-night-900 px-3 py-2 text-sm">
               <span
                 className={`h-2 w-2 shrink-0 rounded-full ${
-                  !idx.enabled ? 'bg-slate-500' : idx.failing ? 'bg-blood' : 'bg-emerald-400'
+                  !idx.enabled ? 'bg-silver' : idx.failing ? 'bg-blood' : 'bg-emerald-400'
                 }`}
               />
-              <span className="truncate text-slate-200">{idx.name}</span>
-              <span className="ml-auto text-xs text-slate-500">
+              <span className="truncate text-parchment">{idx.name}</span>
+              <span className="ml-auto text-xs text-silver">
                 {!idx.enabled ? 'disabled' : idx.failing ? 'failing' : 'ok'}
               </span>
             </div>
@@ -389,20 +389,20 @@ function DiagnosticsPanel() {
 
       {/* Bazarr providers */}
       <section className="card space-y-2 p-4">
-        <h3 className="flex items-center gap-2 font-bold text-slate-100">
+        <h3 className="flex items-center gap-2 font-bold text-parchment">
           <Subtitles size={18} className="text-gold" /> Bazarr Providers
         </h3>
         {data.providers.error ? (
           <p className="text-xs text-blood-light">{data.providers.error}</p>
         ) : data.providers.items.length === 0 ? (
-          <p className="text-sm text-slate-500">No providers configured.</p>
+          <p className="text-sm text-silver">No providers configured.</p>
         ) : (
           data.providers.items.map((p) => {
             const ok = !p.status || /^view on site$/i.test(p.status);
             return (
               <div key={p.name} className="flex items-center gap-2 rounded-lg bg-night-900 px-3 py-2 text-sm">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${ok ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="truncate text-slate-200">{p.name}</span>
+                <span className="truncate text-parchment">{p.name}</span>
                 {!ok && <span className="ml-auto text-xs text-amber-300">{p.status}</span>}
               </div>
             );
@@ -412,18 +412,18 @@ function DiagnosticsPanel() {
 
       {/* Health warnings */}
       <section className="card space-y-2 p-4">
-        <h3 className="flex items-center gap-2 font-bold text-slate-100">
+        <h3 className="flex items-center gap-2 font-bold text-parchment">
           <AlertTriangle size={18} className="text-gold" /> Health Warnings
         </h3>
         {data.healthWarnings.items.length === 0 ? (
-          <p className="text-sm text-slate-500">No warnings. Smooth sailing.</p>
+          <p className="text-sm text-silver">No warnings. Smooth sailing.</p>
         ) : (
           data.healthWarnings.items.map((w, i) => (
             <div key={i} className="rounded-lg bg-night-900 px-3 py-2 text-sm">
-              <span className="mr-2 rounded bg-night-700 px-1.5 py-0.5 text-[11px] uppercase text-slate-300">
+              <span className="mr-2 rounded bg-night-700 px-1.5 py-0.5 text-[11px] uppercase text-parchment/90">
                 {w.service}
               </span>
-              <span className="text-slate-300">{w.message}</span>
+              <span className="text-parchment/90">{w.message}</span>
             </div>
           ))
         )}
@@ -431,11 +431,11 @@ function DiagnosticsPanel() {
 
       {/* Container controls */}
       <section className="card space-y-2 p-4">
-        <h3 className="flex items-center gap-2 font-bold text-slate-100">
+        <h3 className="flex items-center gap-2 font-bold text-parchment">
           <ScrollText size={18} className="text-gold" /> Containers
         </h3>
         {!dockerOn && (
-          <p className="rounded-lg bg-night-900 px-3 py-2 text-xs text-slate-400">
+          <p className="rounded-lg bg-night-900 px-3 py-2 text-xs text-silver">
             Docker socket not mounted — logs and restart are unavailable. Mount
             <code className="mx-1 rounded bg-night-800 px-1">/var/run/docker.sock</code>
             to enable.
@@ -443,7 +443,7 @@ function DiagnosticsPanel() {
         )}
         {Object.keys(SERVICE_LABELS).map((name) => (
           <div key={name} className="flex items-center gap-2 rounded-lg bg-night-900 px-3 py-2">
-            <span className="text-sm text-slate-200">{SERVICE_LABELS[name]}</span>
+            <span className="text-sm text-parchment">{SERVICE_LABELS[name]}</span>
             <div className="ml-auto flex gap-2">
               <button
                 onClick={() => setLogService(name)}
@@ -493,7 +493,7 @@ export default function SettingsTab() {
               key={t.id}
               onClick={() => setSub(t.id)}
               className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition
-                          ${active ? 'bg-gold text-night-950' : 'text-slate-400'}`}
+                          ${active ? 'bg-gold text-night-950' : 'text-silver'}`}
             >
               <Icon size={18} />
               {t.label}
@@ -504,7 +504,7 @@ export default function SettingsTab() {
 
       {sub === 'settings' ? <SettingsPanel /> : <DiagnosticsPanel />}
 
-      <p className="pt-4 text-center text-xs italic text-slate-600">
+      <p className="pt-4 text-center text-xs italic text-silver/70">
         Yo ho ho and a bottle of rum
       </p>
     </div>

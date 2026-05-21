@@ -23,12 +23,12 @@ const STATE_META = {
   uploading: { label: 'Seeding', cls: 'text-emerald-300 bg-emerald-500/15' },
   forcedUP: { label: 'Seeding', cls: 'text-emerald-300 bg-emerald-500/15' },
   stalledUP: { label: 'Seeding', cls: 'text-emerald-300 bg-emerald-500/15' },
-  pausedDL: { label: 'Paused', cls: 'text-slate-400 bg-night-700' },
-  pausedUP: { label: 'Paused', cls: 'text-slate-400 bg-night-700' },
-  stoppedDL: { label: 'Paused', cls: 'text-slate-400 bg-night-700' },
-  stoppedUP: { label: 'Paused', cls: 'text-slate-400 bg-night-700' },
-  queuedDL: { label: 'Queued', cls: 'text-slate-400 bg-night-700' },
-  queuedUP: { label: 'Queued', cls: 'text-slate-400 bg-night-700' },
+  pausedDL: { label: 'Paused', cls: 'text-silver bg-night-700' },
+  pausedUP: { label: 'Paused', cls: 'text-silver bg-night-700' },
+  stoppedDL: { label: 'Paused', cls: 'text-silver bg-night-700' },
+  stoppedUP: { label: 'Paused', cls: 'text-silver bg-night-700' },
+  queuedDL: { label: 'Queued', cls: 'text-silver bg-night-700' },
+  queuedUP: { label: 'Queued', cls: 'text-silver bg-night-700' },
   checkingDL: { label: 'Checking', cls: 'text-gold-light bg-gold/15' },
   checkingUP: { label: 'Checking', cls: 'text-gold-light bg-gold/15' },
   checkingResumeData: { label: 'Checking', cls: 'text-gold-light bg-gold/15' },
@@ -37,7 +37,7 @@ const STATE_META = {
 };
 
 function stateMeta(state) {
-  return STATE_META[state] || { label: state, cls: 'text-slate-400 bg-night-700' };
+  return STATE_META[state] || { label: state, cls: 'text-silver bg-night-700' };
 }
 
 function isPaused(state) {
@@ -48,9 +48,9 @@ function Section({ title, count, children }) {
   return (
     <section className="space-y-2.5">
       <div className="flex items-center gap-2 px-1">
-        <h3 className="text-sm font-bold uppercase tracking-wide text-slate-300">{title}</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wide text-parchment/90">{title}</h3>
         {count != null && (
-          <span className="rounded-full bg-night-700 px-2 py-0.5 text-xs font-semibold text-slate-300">
+          <span className="rounded-full bg-night-700 px-2 py-0.5 text-xs font-semibold text-parchment/90">
             {count}
           </span>
         )}
@@ -66,13 +66,13 @@ function TorrentCard({ t, busy, onToggle, onDelete }) {
   return (
     <div className="card p-3.5">
       <div className="flex items-start gap-2">
-        <p className="min-w-0 flex-1 text-sm font-semibold text-slate-100">{truncate(t.name, 64)}</p>
+        <p className="min-w-0 flex-1 text-sm font-semibold text-parchment">{truncate(t.name, 64)}</p>
         <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${meta.cls}`}>
           {meta.label}
         </span>
       </div>
 
-      <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+      <div className="mt-1 flex items-center gap-2 text-xs text-silver">
         {t.category && <span className="rounded bg-night-800 px-1.5 py-0.5">{t.category}</span>}
         <span>{bytes(t.completed)} / {bytes(t.size)}</span>
       </div>
@@ -80,14 +80,14 @@ function TorrentCard({ t, busy, onToggle, onDelete }) {
       <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-night-800">
         <div
           className={`h-full rounded-full transition-all ${
-            t.state === 'error' ? 'bg-blood' : paused ? 'bg-slate-500' : 'bg-gold'
+            t.state === 'error' ? 'bg-blood' : paused ? 'bg-silver' : 'progress-gold'
           }`}
           style={{ width: percent(t.progress) }}
         />
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
-        <span className="font-semibold text-slate-300">{percent(t.progress)}</span>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-silver">
+        <span className="font-semibold text-parchment/90">{percent(t.progress)}</span>
         <span className="flex items-center gap-1">
           <ArrowDown size={13} className="text-sky-400" /> {speed(t.dlspeed)}
         </span>
@@ -125,8 +125,8 @@ function QueueCard({ item }) {
   return (
     <div className="card p-3">
       <div className="flex items-start gap-2">
-        <p className="min-w-0 flex-1 text-sm font-medium text-slate-200">{truncate(item.title, 60)}</p>
-        <span className="shrink-0 rounded-md bg-night-700 px-2 py-0.5 text-[11px] text-slate-300">
+        <p className="min-w-0 flex-1 text-sm font-medium text-parchment">{truncate(item.title, 60)}</p>
+        <span className="shrink-0 rounded-md bg-night-700 px-2 py-0.5 text-[11px] text-parchment/90">
           {item.trackedDownloadState || item.status}
         </span>
       </div>
@@ -143,9 +143,9 @@ function DeleteDialog({ torrent, onCancel, onConfirm }) {
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
       <div className="card relative z-10 w-full max-w-sm animate-fade-in p-5">
-        <h3 className="text-lg font-bold text-slate-100">Delete torrent?</h3>
-        <p className="mt-1 text-sm text-slate-400">{truncate(torrent.name, 80)}</p>
-        <label className="mt-4 flex items-center gap-2.5 text-sm text-slate-300">
+        <h3 className="text-lg font-bold text-parchment">Delete torrent?</h3>
+        <p className="mt-1 text-sm text-silver">{truncate(torrent.name, 80)}</p>
+        <label className="mt-4 flex items-center gap-2.5 text-sm text-parchment/90">
           <input
             type="checkbox"
             checked={deleteFiles}
@@ -267,7 +267,7 @@ export default function DownloadsTab() {
       )}
 
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">Auto-refreshing every 5s</p>
+        <p className="text-xs text-silver">Auto-refreshing every 5s</p>
         <button
           onClick={() => load()}
           className="btn-ghost px-3 py-1.5 text-xs"
@@ -305,7 +305,7 @@ export default function DownloadsTab() {
               </p>
             )}
             {torrents.length === 0 && !data.torrents.error && (
-              <p className="card p-4 text-center text-sm text-slate-500">No active torrents.</p>
+              <p className="card p-4 text-center text-sm text-silver">No active torrents.</p>
             )}
             {torrents.map((t) => (
               <TorrentCard
@@ -324,7 +324,7 @@ export default function DownloadsTab() {
                 {data.radarrQueue.error}
               </p>
             ) : radarrQ.length === 0 ? (
-              <p className="card p-3 text-center text-sm text-slate-500">Nothing awaiting import.</p>
+              <p className="card p-3 text-center text-sm text-silver">Nothing awaiting import.</p>
             ) : (
               radarrQ.map((item) => <QueueCard key={item.id} item={item} />)
             )}
@@ -336,7 +336,7 @@ export default function DownloadsTab() {
                 {data.sonarrQueue.error}
               </p>
             ) : sonarrQ.length === 0 ? (
-              <p className="card p-3 text-center text-sm text-slate-500">Nothing awaiting import.</p>
+              <p className="card p-3 text-center text-sm text-silver">Nothing awaiting import.</p>
             ) : (
               sonarrQ.map((item) => <QueueCard key={item.id} item={item} />)
             )}
@@ -351,11 +351,11 @@ export default function DownloadsTab() {
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="card p-4 text-center">
                   <p className="text-3xl font-extrabold text-gold">{bazarr?.wantedMovies ?? 0}</p>
-                  <p className="text-xs text-slate-400">Movies</p>
+                  <p className="text-xs text-silver">Movies</p>
                 </div>
                 <div className="card p-4 text-center">
                   <p className="text-3xl font-extrabold text-gold">{bazarr?.wantedEpisodes ?? 0}</p>
-                  <p className="text-xs text-slate-400">Episodes</p>
+                  <p className="text-xs text-silver">Episodes</p>
                 </div>
               </div>
             )}

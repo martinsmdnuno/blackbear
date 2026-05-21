@@ -15,20 +15,20 @@ function ResultCard({ item, onAdd }) {
         {poster ? (
           <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full items-center justify-center text-slate-600">
+          <div className="flex h-full items-center justify-center text-silver/70">
             <Film size={24} />
           </div>
         )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
-          <h3 className="flex-1 font-semibold leading-tight text-slate-100">{item.title}</h3>
+          <h3 className="flex-1 font-semibold leading-tight text-parchment">{item.title}</h3>
           <span className="shrink-0 rounded-md bg-gold/15 px-1.5 py-0.5 text-gold">
             <Plus size={16} />
           </span>
         </div>
-        <p className="text-xs text-slate-400">{item.year || 'Unknown year'}</p>
-        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+        <p className="text-xs text-silver">{item.year || 'Unknown year'}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-silver">
           {truncate(item.overview, 140) || 'No synopsis available.'}
         </p>
       </div>
@@ -88,7 +88,7 @@ export default function SearchTab() {
               key={t.id}
               onClick={() => setType(t.id)}
               className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition
-                          ${isActive ? 'bg-gold text-night-950' : 'text-slate-400'}`}
+                          ${isActive ? 'bg-gold text-night-950' : 'text-silver'}`}
             >
               <Icon size={18} />
               {t.label}
@@ -99,7 +99,7 @@ export default function SearchTab() {
 
       {/* Search input */}
       <div className="relative">
-        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-silver" />
         <input
           autoFocus
           value={term}
@@ -134,7 +134,7 @@ export default function SearchTab() {
           ))}
 
         {!loading && searched && results.length === 0 && !error && (
-          <p className="py-10 text-center text-sm text-slate-500">
+          <p className="py-10 text-center text-sm text-silver">
             No matches for “{term}”.
           </p>
         )}
@@ -149,7 +149,7 @@ export default function SearchTab() {
       </div>
 
       {!searched && !loading && (
-        <p className="py-10 text-center text-sm text-slate-500">
+        <p className="py-10 text-center text-sm text-silver">
           Hunt for treasure — search a title to add it.
         </p>
       )}
