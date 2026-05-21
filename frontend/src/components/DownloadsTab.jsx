@@ -9,6 +9,7 @@ import {
   Users,
   RefreshCw,
   Loader2,
+  Captions,
   X
 } from 'lucide-react';
 import { api } from '../api/client.js';
@@ -174,6 +175,7 @@ export default function DownloadsTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyHash, setBusyHash] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [searchingSubs, setSearchingSubs] = useState(false);
   const [pull, setPull] = useState(0);
   const pullStart = useRef(null);
 
@@ -231,6 +233,18 @@ export default function DownloadsTab() {
       toast.error(err.message);
     } finally {
       setBusyHash(null);
+    }
+  }
+
+  async function searchWantedSubs() {
+    setSearchingSubs(true);
+    try {
+      const r = await api.bazarrSearchWanted();
+      toast.success(`Bazarr searching: ${(r.triggered || ['wanted subtitles']).join(', ')}`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSearchingSubs(false);
     }
   }
 
@@ -348,16 +362,30 @@ export default function DownloadsTab() {
                 {bazarr.error}
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="card p-4 text-center">
-                  <p className="text-3xl font-extrabold text-gold">{bazarr?.wantedMovies ?? 0}</p>
-                  <p className="text-xs text-silver">Movies</p>
+              <>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="card p-4 text-center">
+                    <p className="text-3xl font-extrabold text-gold">{bazarr?.wantedMovies ?? 0}</p>
+                    <p className="text-xs text-silver">Movies</p>
+                  </div>
+                  <div className="card p-4 text-center">
+                    <p className="text-3xl font-extrabold text-gold">{bazarr?.wantedEpisodes ?? 0}</p>
+                    <p className="text-xs text-silver">Episodes</p>
+                  </div>
                 </div>
-                <div className="card p-4 text-center">
-                  <p className="text-3xl font-extrabold text-gold">{bazarr?.wantedEpisodes ?? 0}</p>
-                  <p className="text-xs text-silver">Episodes</p>
-                </div>
-              </div>
+                <button
+                  onClick={searchWantedSubs}
+                  disabled={searchingSubs}
+                  className="btn-ghost mt-2.5 w-full"
+                >
+                  {searchingSubs ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Captions size={16} />
+                  )}
+                  Search wanted subtitles
+                </button>
+              </>
             )}
           </Section>
         </>

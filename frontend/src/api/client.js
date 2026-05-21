@@ -25,6 +25,7 @@ export const api = {
   pipeline: () => req('/pipeline'),
 
   downloads: () => req('/downloads'),
+  bazarrSearchWanted: () => req('/downloads/bazarr/search-wanted', { method: 'POST' }),
   torrentPause: (hash) => req(`/downloads/torrents/${hash}/pause`, { method: 'POST' }),
   torrentResume: (hash) => req(`/downloads/torrents/${hash}/resume`, { method: 'POST' }),
   torrentDelete: (hash, deleteFiles) =>

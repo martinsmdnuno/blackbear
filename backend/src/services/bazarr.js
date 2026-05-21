@@ -27,4 +27,11 @@ export const wantedMovies = () => request('/movies/wanted?start=0&length=1');
 
 export const wantedEpisodes = () => request('/episodes/wanted?start=0&length=1');
 
+export const tasks = () => request('/system/tasks');
+
+// Trigger a Bazarr scheduler task by its job id (e.g. the "search missing
+// subtitles" jobs). Bazarr takes the id as a query param and returns 204.
+export const runTask = (taskid) =>
+  request(`/system/tasks?taskid=${encodeURIComponent(taskid)}`, { method: 'POST' });
+
 export default { request };

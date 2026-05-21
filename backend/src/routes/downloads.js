@@ -79,6 +79,27 @@ router.get('/', async (_req, res) => {
   });
 });
 
+// POST /api/downloads/bazarr/search-wanted
+// Runs Bazarr's "search for missing subtitles" scheduler tasks (movies + series).
+router.post('/bazarr/search-wanted', async (_req, res) => {
+  try {
+    const raw = await bazarr.tasks();
+    const list = raw?.data || raw || [];
+    const wanted = list.filter(
+      (t) =>
+        /wanted_search_missing_subtitles/i.test(t.job_id || '') ||
+        /search.*missing.*subtitle/i.test(t.name || '')
+    );
+    if (!wanted.length) {
+      return res.status(404).json({ error: 'No "search missing subtitles" task found in Bazarr' });
+    }
+    for (const t of wanted) await bazarr.runTask(t.job_id);
+    res.json({ ok: true, triggered: wanted.map((t) => t.name || t.job_id) });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // POST /api/downloads/torrents/:hash/pause
 router.post('/torrents/:hash/pause', async (req, res) => {
   try {
