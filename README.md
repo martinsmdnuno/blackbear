@@ -12,12 +12,15 @@ Three areas:
 
 1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
    monitor options.
-2. **Upcoming** — monitored titles awaiting release: movies with their digital/physical/
+2. **Trending** — what's hot to grab: trending-this-week and all-time-popular movies and
+   series from TMDb, with a one-tap add that resolves each title through Radarr/Sonarr.
+3. **Upcoming** — monitored titles awaiting release: movies with their digital/physical/
    cinema dates and series episodes by air date, each with an "in X days" countdown
    (from the Radarr/Sonarr calendars).
-3. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
-   Bazarr wanted-subtitle counts, auto-refreshing every 5s.
-4. **Settings & Diagnostics** — configure each service, test connections, and inspect
+4. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
+   Bazarr wanted-subtitle counts, auto-refreshing every 5s. Includes a one-tap "Search
+   wanted subtitles" that runs Bazarr's missing-subtitle tasks.
+5. **Settings & Diagnostics** — configure each service, test connections, and inspect
    health, versions, disk space, indexer status, providers, health warnings, container
    logs and restart controls.
 
@@ -131,6 +134,7 @@ Where to find each API key:
 | Prowlarr    | Settings → General → **API Key**                                                |
 | Bazarr      | Settings → General → **API Key** (header is `X-API-KEY`)                        |
 | qBittorrent | No API key — uses the Web UI **username + password** (default user `admin`)     |
+| TMDb        | themoviedb.org → account **Settings → API** → API Key (v3). Needed for Trending |
 
 Secrets are write-only from the UI: the backend returns whether a key is set, never the
 value. Leaving a key field blank on save keeps the existing one.
@@ -147,6 +151,7 @@ RADARR_URL, RADARR_API_KEY, RADARR_CONTAINER
 PROWLARR_URL, PROWLARR_API_KEY, PROWLARR_CONTAINER
 BAZARR_URL, BAZARR_API_KEY, BAZARR_CONTAINER
 QBITTORRENT_URL, QBITTORRENT_USERNAME, QBITTORRENT_PASSWORD, QBITTORRENT_CONTAINER
+TMDB_URL, TMDB_API_KEY
 ```
 
 Once you save in the UI, `config.json` wins and the env seeds are ignored.
@@ -177,12 +182,19 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 | POST   | `/api/downloads/torrents/:hash/pause`           | Pause a torrent                      |
 | POST   | `/api/downloads/torrents/:hash/resume`          | Resume a torrent                     |
 | DELETE | `/api/downloads/torrents/:hash?deleteFiles=...` | Remove a torrent (optionally files)  |
+| POST   | `/api/downloads/bazarr/search-wanted`           | Run Bazarr's "search missing subtitles" tasks |
 
 ### Upcoming
 
 | Method | Path                                              | Purpose                                          |
 |--------|---------------------------------------------------|--------------------------------------------------|
 | GET    | `/api/pipeline?movieDays=365&episodeDays=90`      | Monitored, not-yet-available movies + episodes from the Radarr/Sonarr calendars, sorted by date |
+
+### Trending
+
+| Method | Path                                  | Purpose                                              |
+|--------|---------------------------------------|------------------------------------------------------|
+| GET    | `/api/trending?mode=trending\|popular`| Trending-this-week or popular movies + series (TMDb) |
 
 ### Settings
 

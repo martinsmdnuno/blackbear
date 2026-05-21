@@ -34,6 +34,11 @@ function defaultConfig() {
         username: process.env.QBITTORRENT_USERNAME || 'admin',
         password: process.env.QBITTORRENT_PASSWORD || '',
         container: process.env.QBITTORRENT_CONTAINER || 'qbittorrent'
+      },
+      // TMDb is a public cloud API (no container); used for the Trending tab.
+      tmdb: {
+        url: process.env.TMDB_URL || 'https://api.themoviedb.org/3',
+        apiKey: process.env.TMDB_API_KEY || ''
       }
     }
   };

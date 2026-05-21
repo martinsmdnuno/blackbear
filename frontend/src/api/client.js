@@ -23,6 +23,7 @@ export const api = {
   add: (payload) => req('/add', { method: 'POST', body: JSON.stringify(payload) }),
 
   pipeline: () => req('/pipeline'),
+  trending: (mode = 'trending') => req(`/trending?mode=${mode}`),
 
   downloads: () => req('/downloads'),
   bazarrSearchWanted: () => req('/downloads/bazarr/search-wanted', { method: 'POST' }),

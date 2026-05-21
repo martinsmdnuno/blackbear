@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Telescope, CalendarClock, Sailboat, Anchor } from 'lucide-react';
+import { Telescope, Flame, CalendarClock, Sailboat, Anchor } from 'lucide-react';
 import Sidebar from './components/Sidebar.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import SearchTab from './components/SearchTab.jsx';
+import TrendingTab from './components/TrendingTab.jsx';
 import UpcomingTab from './components/UpcomingTab.jsx';
 import DownloadsTab from './components/DownloadsTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 
 const TABS = [
   { id: 'add', label: 'Add', icon: Telescope },
+  { id: 'trending', label: 'Trending', icon: Flame },
   { id: 'upcoming', label: 'Upcoming', icon: CalendarClock },
   { id: 'downloads', label: 'Downloads', icon: Sailboat },
   { id: 'settings', label: 'Settings', icon: Anchor }
@@ -16,6 +18,7 @@ const TABS = [
 
 const TITLES = {
   add: 'Add Movies & Series',
+  trending: 'Trending Now',
   upcoming: 'Upcoming Releases',
   downloads: 'Downloads',
   settings: 'Settings & Diagnostics'
@@ -48,6 +51,7 @@ export default function App() {
         <main className="flex-1 px-4 pb-24 pt-4 md:px-8 md:pb-8 md:pt-6">
           <div key={active} className="mx-auto max-w-3xl animate-fade-in">
             {active === 'add' && <SearchTab />}
+            {active === 'trending' && <TrendingTab />}
             {active === 'upcoming' && <UpcomingTab />}
             {active === 'downloads' && <DownloadsTab />}
             {active === 'settings' && <SettingsTab />}

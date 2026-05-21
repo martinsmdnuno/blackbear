@@ -24,8 +24,13 @@ const SERVICE_LABELS = {
   radarr: 'Radarr',
   prowlarr: 'Prowlarr',
   bazarr: 'Bazarr',
-  qbittorrent: 'qBittorrent'
+  qbittorrent: 'qBittorrent',
+  tmdb: 'TMDb (Trending)'
 };
+
+// Services backed by a Docker container (i.e. that support restart/logs).
+// TMDb is a cloud API, so it's excluded from the Containers panel.
+const CONTAINER_SERVICES = ['sonarr', 'radarr', 'prowlarr', 'bazarr', 'qbittorrent'];
 
 /* ----------------------------- Settings panel ----------------------------- */
 
@@ -34,6 +39,7 @@ function ServiceForm({ name, value, onChange }) {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
   const isQbit = name === 'qbittorrent';
+  const isTmdb = name === 'tmdb';
 
   async function test() {
     setTesting(true);
@@ -114,16 +120,24 @@ function ServiceForm({ name, value, onChange }) {
         </label>
       )}
 
-      <label className="block">
-        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
-          Container name (for restart/logs)
-        </span>
-        <input
-          className="input"
-          value={value.container || ''}
-          onChange={(e) => onChange({ ...value, container: e.target.value })}
-        />
-      </label>
+      {!isTmdb && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
+            Container name (for restart/logs)
+          </span>
+          <input
+            className="input"
+            value={value.container || ''}
+            onChange={(e) => onChange({ ...value, container: e.target.value })}
+          />
+        </label>
+      )}
+
+      {isTmdb && (
+        <p className="text-xs text-silver">
+          Free API key from themoviedb.org → Settings → API. Powers the Trending tab.
+        </p>
+      )}
 
       <button onClick={test} disabled={testing} className="btn-ghost w-full">
         {testing ? <Loader2 size={16} className="animate-spin" /> : <Plug size={16} />}
@@ -441,7 +455,7 @@ function DiagnosticsPanel() {
             to enable.
           </p>
         )}
-        {Object.keys(SERVICE_LABELS).map((name) => (
+        {CONTAINER_SERVICES.map((name) => (
           <div key={name} className="flex items-center gap-2 rounded-lg bg-night-900 px-3 py-2">
             <span className="text-sm text-parchment">{SERVICE_LABELS[name]}</span>
             <div className="ml-auto flex gap-2">

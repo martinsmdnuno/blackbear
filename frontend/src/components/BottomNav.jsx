@@ -13,10 +13,10 @@ export default function BottomNav({ tabs, active, onChange }) {
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
-              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition
+              className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition
                           ${isActive ? 'text-gold' : 'text-silver'}`}
             >
-              <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
+              <Icon size={20} strokeWidth={isActive ? 2.4 : 1.8} />
               {tab.label}
             </button>
           );
