@@ -272,6 +272,44 @@ and `frontend/` `npm run dev`) and point them at the live services over the LAN.
   `ghcr.io` on every push to `main`; the server then just `docker compose pull && up -d`
   instead of building locally. Faster deploys and the server needs no source checkout.
 
+## Remote access (Cloudflare Tunnel + Access)
+
+> ⚠️ **Blackbear has no built-in auth and can restart containers (Docker socket).**
+> Never expose it to the internet unprotected. The setup below puts it behind
+> **Cloudflare Access**, which authenticates *you* before any traffic reaches the app.
+
+A `cloudflared` service ships in `docker-compose.yml` under the `cloudflare` profile, so
+it only runs when you ask for it. You need a domain managed in Cloudflare.
+
+1. **Create the tunnel.** Cloudflare **Zero Trust** dashboard → **Networks → Tunnels →
+   Create a tunnel** → *Cloudflared* → name it `blackbear`. On the **Docker** tab, copy the
+   token and put it in a local `.env` (git-ignored — see `.env.example`):
+
+   ```
+   CLOUDFLARE_TUNNEL_TOKEN=eyJ...your-token...
+   ```
+
+2. **Map a public hostname.** Still in the tunnel config, add a **Public Hostname**:
+   - Subdomain `blackbear`, your domain, path empty
+   - Service: **HTTP** → `blackbeard-web:80`
+
+3. **Start the tunnel** (alongside the stack):
+
+   ```bash
+   docker compose --profile cloudflare up -d
+   ```
+
+4. **Gate it with Access.** Zero Trust → **Access → Applications → Add an application →
+   Self-hosted** → domain `blackbear.yourdomain.com`. Add a policy: **Allow**, with a rule
+   `Emails → your@email`. Pick **One-time PIN** (or Google) as the login method.
+
+Now `https://blackbear.yourdomain.com` prompts you to log in (email code), then serves the
+app — UI and `/api` both, through the single hostname. The LAN port `8085` keeps working at
+home; the tunnel is purely for outside access.
+
+> Tip: add your phone-friendly login method and you can still **Add to Home Screen** the
+> tunnel URL for a native-feeling app away from home.
+
 ## Notes
 
 - **No auth.** Intended for the LAN, to live behind Tailscale later. Auth is a v2 item.

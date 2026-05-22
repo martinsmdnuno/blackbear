@@ -37,6 +37,24 @@ services:
       - servarr_default
     restart: unless-stopped
 
+  # Optional remote access via Cloudflare Tunnel. Start with:
+  #   docker compose --profile cloudflare up -d
+  # Set CLOUDFLARE_TUNNEL_TOKEN in a local .env (see .env.example). The public
+  # hostname → http://blackbeard-web:80 mapping and the Cloudflare Access policy
+  # are configured in the Cloudflare Zero Trust dashboard (see README).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: blackbear-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - blackbeard-web
+    networks:
+      - servarr_default
+    restart: unless-stopped
+    profiles: ["cloudflare"]
+
 # Join the existing servarr stack network so containers are reachable by name.
 networks:
   servarr_default:
