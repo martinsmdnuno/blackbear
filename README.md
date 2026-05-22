@@ -299,6 +299,9 @@ it only runs when you ask for it. You need a domain managed in Cloudflare.
    docker compose --profile cloudflare up -d
    ```
 
+   > Tip: add `COMPOSE_PROFILES=cloudflare` to your `.env` so plain `docker compose up -d`
+   > (and `scripts/deploy.sh`) always bring the tunnel up — no need to pass the flag each time.
+
 4. **Gate it with Access.** Zero Trust → **Access → Applications → Add an application →
    Self-hosted** → domain `blackbear.yourdomain.com`. Add a policy: **Allow**, with a rule
    `Emails → your@email`. Pick **One-time PIN** (or Google) as the login method.
