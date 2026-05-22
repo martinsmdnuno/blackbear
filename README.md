@@ -216,6 +216,38 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 
 ---
 
+## Development & deploy workflow
+
+Git is the source of truth; **secrets never go in git** — they live only in
+`config/config.json` on the host (git-ignored), entered through the Settings tab.
+
+Typical loop, editing from any machine and running Docker on the home server (e.g. a
+Mac mini):
+
+```bash
+# on your laptop
+git clone git@github.com:<you>/blackbear.git
+cd blackbear
+# ...edit, then:
+git commit -am "feat: ..." && git push
+
+# deploy to the server (SSHes in, pulls, rebuilds)
+./scripts/deploy.sh
+# or override the target:
+BLACKBEAR_HOST=user@host BLACKBEAR_DIR=/srv/blackbear ./scripts/deploy.sh
+```
+
+For local development without the server, run the dev servers (`backend/` `npm run dev`
+and `frontend/` `npm run dev`) and point them at the live services over the LAN.
+
+**Recommended upgrades:**
+
+- **Tailscale** — SSH to the server and reach the web UI by a stable name from anywhere,
+  no port-forwarding. Replace the LAN IP in `deploy.sh` with the Tailscale host.
+- **CI images (GHCR)** — a GitHub Action can build and push the two images to
+  `ghcr.io` on every push to `main`; the server then just `docker compose pull && up -d`
+  instead of building locally. Faster deploys and the server needs no source checkout.
+
 ## Notes
 
 - **No auth.** Intended for the LAN, to live behind Tailscale later. Auth is a v2 item.
