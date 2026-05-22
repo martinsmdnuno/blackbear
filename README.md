@@ -1,14 +1,29 @@
-# 🐻‍⬛ Blackbear — Home Server Download Manager
+<div align="center">
 
-A mobile-first web app to command your home media server from your phone. Blackbear
-is a single dark-themed interface that aggregates the features scattered across the
-servarr stack (Sonarr, Radarr, Prowlarr, Bazarr, qBittorrent) running in Docker.
+<img src="frontend/public/blackbear-logo.png" alt="Blackbear" width="132" />
 
-> Brand: a black-bear pirate captain. Deep-sea-blue + midnight-black UI with treasure-gold
-> accents and mutiny-red for destructive actions; display type in Pirata One, data in Inter.
-> Docker service/container names stay `blackbeard-*` for continuity with the running stack.
+# Blackbear
 
-Three areas:
+**Command your home media server from your phone.** 🏴‍☠️
+
+A mobile-first, installable web app that unifies the *arr stack — Sonarr, Radarr,
+Prowlarr, Bazarr and qBittorrent — behind one dark, pirate-themed interface.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-C9A055.svg)](LICENSE)
+&nbsp;![React](https://img.shields.io/badge/React-18-0C1B33?logo=react&logoColor=61DAFB)
+&nbsp;![Node + Express](https://img.shields.io/badge/Node-Express-0C1B33?logo=node.js&logoColor=339933)
+&nbsp;![Docker](https://img.shields.io/badge/Docker-ready-0C1B33?logo=docker&logoColor=2496ED)
+&nbsp;![PWA](https://img.shields.io/badge/PWA-installable-C9A055)
+
+</div>
+
+> **Brand:** a black-bear pirate captain — deep-sea-blue + midnight-black UI, treasure-gold
+> accents, mutiny-red for destructive actions, Pirata One display type. Docker service names
+> stay `blackbeard-*` for continuity with the running stack.
+
+## ✨ Features
+
+The app, in five areas:
 
 1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
    monitor options.
@@ -26,6 +41,15 @@ Three areas:
 
 Mobile-first and installable: open it on your phone and **Add to Home Screen** to run
 it fullscreen like a native app (PWA manifest, no input-focus zoom, no overscroll bounce).
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshot-desktop.png" alt="Blackbear on desktop" width="760" />
+</p>
+<p align="center">
+  <img src="docs/screenshot-mobile.png" alt="Blackbear on mobile" width="260" />
+</p>
 
 ---
 

@@ -37,10 +37,10 @@ export default function App() {
           <img
             src="/blackbear-logo.png"
             alt="Blackbear"
-            className="h-9 w-9 rounded-md object-cover ring-1 ring-gold/30"
+            className="h-9 w-9 shrink-0 rounded-md object-cover ring-1 ring-gold/30"
           />
-          <span className="font-display text-2xl leading-none text-parchment">Blackbear</span>
-          <span className="ml-auto text-xs text-silver">{TITLES[active]}</span>
+          <span className="shrink-0 font-display text-2xl leading-none text-parchment">Blackbear</span>
+          <span className="ml-auto min-w-0 truncate pl-2 text-xs text-silver">{TITLES[active]}</span>
         </header>
 
         {/* Desktop header */}
