@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { getConfig, saveConfig } from '../config.js';
 import { probeService, SERVICE_NAMES } from '../services/probe.js';
+import { startCleanupLoop } from '../services/cleanup.js';
 
 const router = Router();
 
 // Never send secrets back to the frontend; expose only whether they are set.
+// Non-secret app settings (e.g. cleanup) are returned as-is.
 function sanitize(config) {
-  const out = { services: {} };
+  const out = { services: {}, app: config.app || {} };
   for (const [name, cfg] of Object.entries(config.services)) {
     const safe = { url: cfg.url, container: cfg.container };
     if ('username' in cfg) safe.username = cfg.username;
@@ -25,10 +27,15 @@ router.get('/', (_req, res) => {
 // POST /api/settings  (partial update; empty secrets are preserved)
 router.post('/', (req, res) => {
   const body = req.body || {};
-  if (!body.services || typeof body.services !== 'object') {
-    return res.status(400).json({ error: 'Expected { services: { ... } }' });
+  const update = {};
+  if (body.services && typeof body.services === 'object') update.services = body.services;
+  if (body.app && typeof body.app === 'object') update.app = body.app;
+  if (!update.services && !update.app) {
+    return res.status(400).json({ error: 'Expected { services } and/or { app }' });
   }
-  const updated = saveConfig({ services: body.services });
+  const updated = saveConfig(update);
+  // Re-arm the cleanup loop if its settings changed.
+  if (update.app?.cleanup) startCleanupLoop();
   res.json(sanitize(updated));
 });
 

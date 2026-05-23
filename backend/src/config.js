@@ -40,9 +40,23 @@ function defaultConfig() {
         url: process.env.TMDB_URL || 'https://api.themoviedb.org/3',
         apiKey: process.env.TMDB_API_KEY || ''
       }
+    },
+    // Non-secret app behaviour (editable in Settings, persisted in config.json).
+    app: {
+      cleanup: {
+        enabled: false, // off by default — opt-in, never deletes silently
+        ratio: 1.0, // remove a completed torrent once it has seeded to this ratio
+        deleteFiles: true, // also delete the torrent's files (safe with hardlinks)
+        intervalSeconds: 120
+      }
     }
   };
 }
+
+// Where the mutable "seen" list (hidden Trending items) lives — next to
+// config.json, in the same persisted volume, but separate so the secrets file
+// isn't rewritten on every dismiss.
+const SEEN_PATH = resolve(dirname(CONFIG_PATH), 'seen.json');
 
 let cache = null;
 
@@ -85,6 +99,10 @@ export function getService(name) {
   return getConfig().services[name];
 }
 
+export function getAppConfig() {
+  return getConfig().app || {};
+}
+
 function persist() {
   const dir = dirname(CONFIG_PATH);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -109,4 +127,4 @@ export function saveConfig(update) {
   return cache;
 }
 
-export { CONFIG_PATH };
+export { CONFIG_PATH, SEEN_PATH };

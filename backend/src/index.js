@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { loadConfig, CONFIG_PATH } from './config.js';
+import { startCleanupLoop } from './services/cleanup.js';
 import searchRoutes from './routes/search.js';
 import addRoutes from './routes/add.js';
 import downloadsRoutes from './routes/downloads.js';
@@ -35,4 +36,5 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`🏴‍☠️  BlackBeard backend listening on :${PORT}`);
   console.log(`    config: ${CONFIG_PATH}`);
+  startCleanupLoop();
 });

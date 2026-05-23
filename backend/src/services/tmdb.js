@@ -52,7 +52,15 @@ export async function discover(mode = 'trending') {
   };
 }
 
+export const movieRecommendations = (id) =>
+  get(`/movie/${id}/recommendations`).then((r) => (r?.results || []).map(mapMovie));
+
+export const tvRecommendations = (id) =>
+  get(`/tv/${id}/recommendations`).then((r) => (r?.results || []).map(mapTv));
+
+export { mapMovie, mapTv };
+
 // Cheap call to validate the API key for the diagnostics/test probe.
 export const ping = () => get('/configuration');
 
-export default { discover, ping };
+export default { discover, ping, movieRecommendations, tvRecommendations };
