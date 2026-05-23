@@ -26,8 +26,8 @@ Prowlarr, Bazarr and qBittorrent — behind one dark, pirate-themed interface.
 The app, in five areas:
 
 1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
-   monitor options. A **Person** mode searches actors & directors (TMDb) and lists their
-   filmography to add from.
+   monitor options. Results show the **IMDb/TMDb rating** so you can judge a title before
+   adding. A **Person** mode searches actors & directors (TMDb) and lists their filmography.
 2. **Trending** — what's hot to grab: **Trending** (this week), **Popular**, and **For You**
    (recommendations from your Radarr/Sonarr history via TMDb). One-tap add that resolves each
    title through Radarr/Sonarr, and a "hide" button to mark titles seen so they stop showing.

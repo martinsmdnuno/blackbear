@@ -1,9 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Film, Tv, User, Plus, Loader2, X } from 'lucide-react';
+import { Search, Film, Tv, User, Plus, Loader2, X, Star } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
 import { truncate } from '../lib/format.js';
+
+// Radarr/Sonarr lookups embed ratings. Prefer IMDb, then TMDb, then the simple
+// (TVDB/community) value — so you can sanity-check a title before adding.
+function pickRating(ratings) {
+  if (!ratings) return null;
+  if (ratings.imdb?.value > 0) return { value: ratings.imdb.value, source: 'IMDb' };
+  if (ratings.tmdb?.value > 0) return { value: ratings.tmdb.value, source: 'TMDb' };
+  if (typeof ratings.value === 'number' && ratings.value > 0)
+    return { value: ratings.value, source: '' };
+  return null;
+}
+
+function RatingBadge({ rating }) {
+  if (!rating) return null;
+  return (
+    <span className="flex items-center gap-0.5 text-gold-light">
+      <Star size={11} className="fill-gold-light" /> {rating.value.toFixed(1)}
+      {rating.source && <span className="text-silver">{rating.source}</span>}
+    </span>
+  );
+}
 
 const MODES = [
   { id: 'movie', label: 'Movie', icon: Film },
@@ -34,7 +55,10 @@ function ResultCard({ item, onAdd }) {
             <Plus size={16} />
           </span>
         </div>
-        <p className="text-xs text-silver">{item.year || 'Unknown year'}</p>
+        <div className="flex items-center gap-2 text-xs text-silver">
+          <span>{item.year || 'Unknown year'}</span>
+          <RatingBadge rating={pickRating(item.ratings)} />
+        </div>
         <p className="mt-1.5 text-xs leading-relaxed text-silver">
           {truncate(item.overview, 140) || 'No synopsis available.'}
         </p>
@@ -88,9 +112,15 @@ function CreditCard({ item, busy, onAdd }) {
       </div>
       <div className="min-w-0 flex-1">
         <h4 className="text-sm font-semibold leading-tight text-parchment">{item.title}</h4>
-        <p className="text-xs text-silver">
-          {item.year || '—'} · <span className="text-gold-light">{item.role}</span>
-        </p>
+        <div className="flex items-center gap-1.5 text-xs text-silver">
+          <span>{item.year || '—'}</span>
+          <span className="text-gold-light">{item.role}</span>
+          {item.rating ? (
+            <span className="flex items-center gap-0.5 text-gold-light">
+              <Star size={10} className="fill-gold-light" /> {item.rating}
+            </span>
+          ) : null}
+        </div>
       </div>
       <span className="self-center text-gold">
         {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
