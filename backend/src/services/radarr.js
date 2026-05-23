@@ -13,6 +13,9 @@ export const addMovie = (payload) => client.post('/movie', payload);
 
 export const allMovies = () => client.get('/movie');
 
+export const deleteMovie = (id, deleteFiles) =>
+  client.del(`/movie/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}&addImportExclusion=false`);
+
 export const queue = () => client.get('/queue?pageSize=100');
 
 export const systemStatus = () => client.get('/system/status');

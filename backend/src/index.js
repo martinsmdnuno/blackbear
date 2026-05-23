@@ -7,6 +7,7 @@ import addRoutes from './routes/add.js';
 import downloadsRoutes from './routes/downloads.js';
 import pipelineRoutes from './routes/pipeline.js';
 import trendingRoutes from './routes/trending.js';
+import libraryRoutes from './routes/library.js';
 import settingsRoutes from './routes/settings.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
 
@@ -25,6 +26,7 @@ app.use('/api/add', addRoutes);
 app.use('/api/downloads', downloadsRoutes);
 app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/trending', trendingRoutes);
+app.use('/api/library', libraryRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/diagnostics', diagnosticsRoutes);
 

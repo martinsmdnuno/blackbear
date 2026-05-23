@@ -44,6 +44,12 @@ export const api = {
   testConnection: (service) =>
     req('/settings/test', { method: 'POST', body: JSON.stringify({ service }) }),
 
+  library: () => req('/library'),
+  deleteMovie: (id, deleteFiles) =>
+    req(`/library/movie/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`, { method: 'DELETE' }),
+  deleteSeries: (id, deleteFiles) =>
+    req(`/library/series/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`, { method: 'DELETE' }),
+
   diagnostics: () => req('/diagnostics'),
   logs: (service, tail = 200) => req(`/diagnostics/logs/${service}?tail=${tail}`),
   restart: (service) => req(`/diagnostics/restart/${service}`, { method: 'POST' })

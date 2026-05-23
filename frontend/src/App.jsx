@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Telescope, Flame, CalendarClock, Sailboat, Anchor } from 'lucide-react';
+import { Telescope, Flame, CalendarClock, Sailboat, Library, Anchor } from 'lucide-react';
 import Sidebar from './components/Sidebar.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import SearchTab from './components/SearchTab.jsx';
 import TrendingTab from './components/TrendingTab.jsx';
 import UpcomingTab from './components/UpcomingTab.jsx';
 import DownloadsTab from './components/DownloadsTab.jsx';
+import LibraryTab from './components/LibraryTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'trending', label: 'Trending', icon: Flame },
   { id: 'upcoming', label: 'Upcoming', icon: CalendarClock },
   { id: 'downloads', label: 'Downloads', icon: Sailboat },
+  { id: 'library', label: 'Library', icon: Library },
   { id: 'settings', label: 'Settings', icon: Anchor }
 ];
 
@@ -21,6 +23,7 @@ const TITLES = {
   trending: 'Trending Now',
   upcoming: 'Upcoming Releases',
   downloads: 'Downloads',
+  library: 'My Library',
   settings: 'Settings & Diagnostics'
 };
 
@@ -54,6 +57,7 @@ export default function App() {
             {active === 'trending' && <TrendingTab />}
             {active === 'upcoming' && <UpcomingTab />}
             {active === 'downloads' && <DownloadsTab />}
+            {active === 'library' && <LibraryTab />}
             {active === 'settings' && <SettingsTab />}
           </div>
         </main>

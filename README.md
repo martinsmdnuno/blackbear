@@ -37,7 +37,10 @@ The app, in five areas:
 4. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
    Bazarr wanted-subtitle counts, auto-refreshing every 5s. Includes a one-tap "Search
    wanted subtitles" that runs Bazarr's missing-subtitle tasks.
-5. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
+5. **Library** — browse everything in Radarr/Sonarr (with size on disk, filterable), and
+   delete a title — removing it from the *arr and, optionally, its files from disk (with a
+   confirmation dialog + "delete files" checkbox).
+6. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
    as "Saved ✓"), test connections, optional **auto-cleanup** (remove a finished torrent once
    it seeds to a chosen ratio, freeing space — skips anything still importing), and inspect
    health, versions, disk space, indexer status, providers, warnings, container logs/restart.
@@ -227,6 +230,14 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 | GET    | `/api/trending/recommended`           | "For You" — TMDb recommendations seeded from your Radarr/Sonarr library |
 | POST   | `/api/trending/seen`                  | Hide an item `{ type, tmdbId }` (persisted)          |
 | DELETE | `/api/trending/seen`                  | Un-hide an item `{ type, tmdbId }`                   |
+
+### Library
+
+| Method | Path                                       | Purpose                                       |
+|--------|--------------------------------------------|-----------------------------------------------|
+| GET    | `/api/library`                             | All Radarr movies + Sonarr series (with size) |
+| DELETE | `/api/library/movie/:id?deleteFiles=true`  | Delete a movie from Radarr (and disk)         |
+| DELETE | `/api/library/series/:id?deleteFiles=true` | Delete a series from Sonarr (and disk)        |
 
 ### Settings
 

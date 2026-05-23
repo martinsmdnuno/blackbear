@@ -13,6 +13,9 @@ export const addSeries = (payload) => client.post('/series', payload);
 
 export const allSeries = () => client.get('/series');
 
+export const deleteSeries = (id, deleteFiles) =>
+  client.del(`/series/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`);
+
 export const queue = () =>
   client.get('/queue?includeUnknownSeriesItems=true&pageSize=100');
 
