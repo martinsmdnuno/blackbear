@@ -18,6 +18,8 @@ async function req(path, options = {}) {
 
 export const api = {
   search: (type, term) => req(`/search?type=${type}&term=${encodeURIComponent(term)}`),
+  searchPerson: (q) => req(`/search/person?q=${encodeURIComponent(q)}`),
+  personCredits: (id) => req(`/search/person/${id}`),
   qualityProfiles: (type) => req(`/add/quality-profiles?type=${type}`),
   rootFolders: (type) => req(`/add/root-folders?type=${type}`),
   add: (payload) => req('/add', { method: 'POST', body: JSON.stringify(payload) }),

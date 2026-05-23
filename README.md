@@ -26,7 +26,8 @@ Prowlarr, Bazarr and qBittorrent — behind one dark, pirate-themed interface.
 The app, in five areas:
 
 1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
-   monitor options.
+   monitor options. A **Person** mode searches actors & directors (TMDb) and lists their
+   filmography to add from.
 2. **Trending** — what's hot to grab: **Trending** (this week), **Popular**, and **For You**
    (recommendations from your Radarr/Sonarr history via TMDb). One-tap add that resolves each
    title through Radarr/Sonarr, and a "hide" button to mark titles seen so they stop showing.
@@ -193,6 +194,8 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 | Method | Path                                          | Purpose                                  |
 |--------|-----------------------------------------------|------------------------------------------|
 | GET    | `/api/search?type=movie\|series&term=...`     | Lookup via Radarr/Sonarr                 |
+| GET    | `/api/search/person?q=...`                    | Search people (actors/directors) via TMDb|
+| GET    | `/api/search/person/:id`                      | A person's movies + series (filmography) |
 | GET    | `/api/add/quality-profiles?type=movie\|series`| List quality profiles                    |
 | GET    | `/api/add/root-folders?type=movie\|series`    | List root folders                        |
 | POST   | `/api/add`                                    | Add `{ type, item, options }`            |
