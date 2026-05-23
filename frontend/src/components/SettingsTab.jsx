@@ -40,6 +40,7 @@ function ServiceForm({ name, value, onChange }) {
   const [result, setResult] = useState(null);
   const isQbit = name === 'qbittorrent';
   const isTmdb = name === 'tmdb';
+  const configured = value.apiKeyConfigured || value.passwordConfigured;
 
   async function test() {
     setTesting(true);
@@ -60,12 +61,19 @@ function ServiceForm({ name, value, onChange }) {
     <div className="card space-y-3 p-4">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-parchment">{SERVICE_LABELS[name]}</h3>
-        {result &&
-          (result.ok ? (
-            <CheckCircle2 size={18} className="text-emerald-400" />
-          ) : (
-            <XCircle size={18} className="text-blood-light" />
-          ))}
+        <div className="flex items-center gap-2">
+          {configured && !result && (
+            <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+              Saved ✓
+            </span>
+          )}
+          {result &&
+            (result.ok ? (
+              <CheckCircle2 size={18} className="text-emerald-400" />
+            ) : (
+              <XCircle size={18} className="text-blood-light" />
+            ))}
+        </div>
       </div>
 
       <label className="block">
@@ -103,6 +111,9 @@ function ServiceForm({ name, value, onChange }) {
               onChange={(e) => onChange({ ...value, password: e.target.value })}
               placeholder={value.passwordConfigured ? '•••••••• (set)' : 'not set'}
             />
+            {value.passwordConfigured && (
+              <span className="mt-1 block text-[11px] text-silver">Saved — blank keeps it.</span>
+            )}
           </label>
         </div>
       ) : (
@@ -117,6 +128,11 @@ function ServiceForm({ name, value, onChange }) {
             onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
             placeholder={value.apiKeyConfigured ? '•••••••• (set)' : 'not set'}
           />
+          {value.apiKeyConfigured && (
+            <span className="mt-1 block text-[11px] text-silver">
+              Saved &amp; persisted — leave blank to keep it.
+            </span>
+          )}
         </label>
       )}
 
@@ -148,16 +164,76 @@ function ServiceForm({ name, value, onChange }) {
   );
 }
 
+function CleanupCard({ value, onChange }) {
+  const c = value || {};
+  return (
+    <div className="card space-y-3 p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-parchment">Downloads cleanup</h3>
+        <button
+          type="button"
+          aria-label="toggle cleanup"
+          onClick={() => onChange({ ...c, enabled: !c.enabled })}
+          className={`relative h-6 w-11 rounded-full transition ${c.enabled ? 'bg-gold' : 'bg-night-700'}`}
+        >
+          <span
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
+              c.enabled ? 'left-[22px]' : 'left-0.5'
+            }`}
+          />
+        </button>
+      </div>
+      <p className="text-xs text-silver">
+        When on, a finished torrent is removed once it has seeded to the ratio below — and its
+        files deleted to free space (safe with hardlinks: your library stays intact). Torrents
+        Sonarr/Radarr are still importing are skipped.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
+            Remove at ratio
+          </span>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            className="input"
+            value={c.ratio ?? 1}
+            disabled={!c.enabled}
+            onChange={(e) => onChange({ ...c, ratio: Number(e.target.value) })}
+          />
+        </label>
+        <label className="flex items-end pb-2.5">
+          <span className="flex items-center gap-2 text-sm text-parchment">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-gold"
+              checked={c.deleteFiles !== false}
+              disabled={!c.enabled}
+              onChange={(e) => onChange({ ...c, deleteFiles: e.target.checked })}
+            />
+            Delete files
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPanel() {
   const toast = useToast();
   const [form, setForm] = useState(null);
+  const [app, setApp] = useState({ cleanup: {} });
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api
       .settings()
-      .then((s) => setForm(s.services))
+      .then((s) => {
+        setForm(s.services);
+        setApp(s.app || { cleanup: {} });
+      })
       .catch((err) => setError(err.message));
   }, []);
 
@@ -165,13 +241,14 @@ function SettingsPanel() {
     setSaving(true);
     try {
       // Strip the *Configured booleans before sending; empty secrets are kept by the backend.
-      const payload = {};
+      const services = {};
       for (const [name, cfg] of Object.entries(form)) {
         const { apiKeyConfigured, passwordConfigured, ...rest } = cfg;
-        payload[name] = rest;
+        services[name] = rest;
       }
-      const updated = await api.saveSettings(payload);
+      const updated = await api.saveSettings({ services, app: { cleanup: app.cleanup } });
       setForm(updated.services);
+      setApp(updated.app || { cleanup: {} });
       toast.success('Settings saved');
     } catch (err) {
       toast.error(err.message);
@@ -207,6 +284,7 @@ function SettingsPanel() {
           onChange={(v) => setForm({ ...form, [name]: v })}
         />
       ))}
+      <CleanupCard value={app.cleanup} onChange={(cleanup) => setApp({ ...app, cleanup })} />
       <button onClick={save} disabled={saving} className="btn-gold w-full">
         {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
         Save settings

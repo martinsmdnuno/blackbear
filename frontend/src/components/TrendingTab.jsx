@@ -1,47 +1,60 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Flame, TrendingUp, Film, Tv, Plus, Loader2, Star } from 'lucide-react';
+import { Flame, TrendingUp, Sparkles, Film, Tv, Plus, Loader2, Star, EyeOff } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
 import { truncate } from '../lib/format.js';
 
-function Card({ item, busy, onPick }) {
+const MODES = [
+  { id: 'trending', label: 'Trending', icon: Flame },
+  { id: 'popular', label: 'Popular', icon: TrendingUp },
+  { id: 'recommended', label: 'For You', icon: Sparkles }
+];
+
+function Card({ item, busy, onPick, onHide }) {
   const Icon = item.type === 'movie' ? Film : Tv;
   return (
-    <button
-      onClick={onPick}
-      disabled={busy}
-      className="card flex w-full gap-3 p-3 text-left transition hover:border-gold/50 disabled:opacity-60"
-    >
-      <div className="h-28 w-[74px] shrink-0 overflow-hidden rounded-md bg-night-800">
-        {item.poster ? (
-          <img src={item.poster} alt="" loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-silver/60">
-            <Icon size={22} />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-2">
-          <h3 className="flex-1 font-semibold leading-tight text-parchment">{item.title}</h3>
-          <span className="shrink-0 rounded-md bg-gold/15 px-1.5 py-0.5 text-gold">
-            {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-          </span>
+    <div className="card relative flex gap-3 p-3 transition hover:border-gold/50">
+      <button
+        onClick={onPick}
+        disabled={busy}
+        className="flex flex-1 gap-3 pr-7 text-left disabled:opacity-60"
+      >
+        <div className="h-28 w-[74px] shrink-0 overflow-hidden rounded-md bg-night-800">
+          {item.poster ? (
+            <img src={item.poster} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-silver/60">
+              <Icon size={22} />
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-silver">
-          <span>{item.year || '—'}</span>
-          {item.rating ? (
-            <span className="flex items-center gap-0.5 text-gold-light">
-              <Star size={11} className="fill-gold-light" /> {item.rating}
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold leading-tight text-parchment">{item.title}</h3>
+          <div className="flex items-center gap-2 text-xs text-silver">
+            <span>{item.year || '—'}</span>
+            {item.rating ? (
+              <span className="flex items-center gap-0.5 text-gold-light">
+                <Star size={11} className="fill-gold-light" /> {item.rating}
+              </span>
+            ) : null}
+            <span className="inline-flex items-center gap-0.5 text-gold">
+              {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} add
             </span>
-          ) : null}
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-silver">
+            {truncate(item.overview, 120) || 'No synopsis available.'}
+          </p>
         </div>
-        <p className="mt-1.5 text-xs leading-relaxed text-silver">
-          {truncate(item.overview, 130) || 'No synopsis available.'}
-        </p>
-      </div>
-    </button>
+      </button>
+      <button
+        onClick={onHide}
+        title="Already seen — hide"
+        className="absolute right-2 top-2 rounded-md p-1 text-silver transition hover:bg-night-800 hover:text-blood-light"
+      >
+        <EyeOff size={15} />
+      </button>
+    </div>
   );
 }
 
@@ -69,13 +82,14 @@ export default function TrendingTab() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lookingUp, setLookingUp] = useState(null);
+  const [hidden, setHidden] = useState(new Set());
   const [selected, setSelected] = useState(null);
 
   const load = useCallback(async (m) => {
     setLoading(true);
     setData(null);
     try {
-      const res = await api.trending(m);
+      const res = m === 'recommended' ? await api.recommended() : await api.trending(m);
       setData(res);
       setError(null);
     } catch (err) {
@@ -111,27 +125,41 @@ export default function TrendingTab() {
     }
   }
 
-  const movies = data?.movies || [];
-  const series = data?.series || [];
+  async function hide(item) {
+    setHidden((h) => new Set(h).add(item.tmdbId));
+    try {
+      await api.markSeen(item.type, item.tmdbId);
+    } catch (err) {
+      toast.error(err.message);
+      setHidden((h) => {
+        const n = new Set(h);
+        n.delete(item.tmdbId);
+        return n;
+      });
+    }
+  }
+
+  const movies = (data?.movies || []).filter((m) => !hidden.has(m.tmdbId));
+  const series = (data?.series || []).filter((s) => !hidden.has(s.tmdbId));
+  const isRecommended = mode === 'recommended';
+  const emptyRecommended =
+    isRecommended && data && !movies.length && !series.length;
 
   return (
     <div className="space-y-5">
-      {/* Trending / Popular toggle */}
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-night-850 p-1">
-        {[
-          { id: 'trending', label: 'Trending', icon: Flame },
-          { id: 'popular', label: 'Popular', icon: TrendingUp }
-        ].map((t) => {
+      {/* Trending / Popular / For You */}
+      <div className="grid grid-cols-3 gap-1 rounded-lg bg-night-850 p-1">
+        {MODES.map((t) => {
           const Icon = t.icon;
           const active = mode === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setMode(t.id)}
-              className={`flex items-center justify-center gap-2 rounded-md py-2.5 text-sm font-semibold transition
+              className={`flex items-center justify-center gap-1.5 rounded-md py-2.5 text-sm font-semibold transition
                           ${active ? 'bg-gold text-night-950' : 'text-silver'}`}
             >
-              <Icon size={18} />
+              <Icon size={16} />
               {t.label}
             </button>
           );
@@ -142,7 +170,7 @@ export default function TrendingTab() {
         <p className="rounded-md border border-blood/40 bg-blood/10 px-3 py-2.5 text-sm text-blood-light">
           {error}
           <span className="mt-1 block text-xs text-silver">
-            Set a TMDb API key in Settings to enable Trending.
+            Set a TMDb API key in Settings to enable this.
           </span>
         </p>
       )}
@@ -162,14 +190,32 @@ export default function TrendingTab() {
         </div>
       )}
 
-      {data && (
+      {emptyRecommended && (
+        <p className="card p-6 text-center text-sm text-silver">
+          No recommendations yet. Add a few movies or series (Radarr/Sonarr) and Blackbear will
+          suggest similar titles here.
+        </p>
+      )}
+
+      {data && !emptyRecommended && (
         <>
+          {isRecommended && data.basedOn && (
+            <p className="px-1 text-xs text-silver">
+              Based on {data.basedOn.movies} movies and {data.basedOn.series} series in your library.
+            </p>
+          )}
           <Section title="Movies" count={movies.length} icon={Film}>
             {movies.length === 0 ? (
               <p className="card p-4 text-center text-sm text-silver">Nothing here right now.</p>
             ) : (
               movies.map((m) => (
-                <Card key={`m${m.tmdbId}`} item={m} busy={lookingUp === m.tmdbId} onPick={() => pick(m)} />
+                <Card
+                  key={`m${m.tmdbId}`}
+                  item={m}
+                  busy={lookingUp === m.tmdbId}
+                  onPick={() => pick(m)}
+                  onHide={() => hide(m)}
+                />
               ))
             )}
           </Section>
@@ -179,7 +225,13 @@ export default function TrendingTab() {
               <p className="card p-4 text-center text-sm text-silver">Nothing here right now.</p>
             ) : (
               series.map((s) => (
-                <Card key={`s${s.tmdbId}`} item={s} busy={lookingUp === s.tmdbId} onPick={() => pick(s)} />
+                <Card
+                  key={`s${s.tmdbId}`}
+                  item={s}
+                  busy={lookingUp === s.tmdbId}
+                  onPick={() => pick(s)}
+                  onHide={() => hide(s)}
+                />
               ))
             )}
           </Section>

@@ -24,6 +24,9 @@ export const api = {
 
   pipeline: () => req('/pipeline'),
   trending: (mode = 'trending') => req(`/trending?mode=${mode}`),
+  recommended: () => req('/trending/recommended'),
+  markSeen: (type, tmdbId) =>
+    req('/trending/seen', { method: 'POST', body: JSON.stringify({ type, tmdbId }) }),
 
   downloads: () => req('/downloads'),
   bazarrSearchWanted: () => req('/downloads/bazarr/search-wanted', { method: 'POST' }),
@@ -35,7 +38,7 @@ export const api = {
     }),
 
   settings: () => req('/settings'),
-  saveSettings: (services) => req('/settings', { method: 'POST', body: JSON.stringify({ services }) }),
+  saveSettings: (payload) => req('/settings', { method: 'POST', body: JSON.stringify(payload) }),
   testConnection: (service) =>
     req('/settings/test', { method: 'POST', body: JSON.stringify({ service }) }),
 

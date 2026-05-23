@@ -27,17 +27,19 @@ The app, in five areas:
 
 1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
    monitor options.
-2. **Trending** — what's hot to grab: trending-this-week and all-time-popular movies and
-   series from TMDb, with a one-tap add that resolves each title through Radarr/Sonarr.
+2. **Trending** — what's hot to grab: **Trending** (this week), **Popular**, and **For You**
+   (recommendations from your Radarr/Sonarr history via TMDb). One-tap add that resolves each
+   title through Radarr/Sonarr, and a "hide" button to mark titles seen so they stop showing.
 3. **Upcoming** — monitored titles awaiting release: movies with their digital/physical/
    cinema dates and series episodes by air date, each with an "in X days" countdown
    (from the Radarr/Sonarr calendars).
 4. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
    Bazarr wanted-subtitle counts, auto-refreshing every 5s. Includes a one-tap "Search
    wanted subtitles" that runs Bazarr's missing-subtitle tasks.
-5. **Settings & Diagnostics** — configure each service, test connections, and inspect
-   health, versions, disk space, indexer status, providers, health warnings, container
-   logs and restart controls.
+5. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
+   as "Saved ✓"), test connections, optional **auto-cleanup** (remove a finished torrent once
+   it seeds to a chosen ratio, freeing space — skips anything still importing), and inspect
+   health, versions, disk space, indexer status, providers, warnings, container logs/restart.
 
 Mobile-first and installable: open it on your phone and **Add to Home Screen** to run
 it fullscreen like a native app (PWA manifest, no input-focus zoom, no overscroll bounce).
@@ -219,6 +221,9 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 | Method | Path                                  | Purpose                                              |
 |--------|---------------------------------------|------------------------------------------------------|
 | GET    | `/api/trending?mode=trending\|popular`| Trending-this-week or popular movies + series (TMDb) |
+| GET    | `/api/trending/recommended`           | "For You" — TMDb recommendations seeded from your Radarr/Sonarr library |
+| POST   | `/api/trending/seen`                  | Hide an item `{ type, tmdbId }` (persisted)          |
+| DELETE | `/api/trending/seen`                  | Un-hide an item `{ type, tmdbId }`                   |
 
 ### Settings
 
