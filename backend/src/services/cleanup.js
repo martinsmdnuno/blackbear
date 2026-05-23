@@ -32,7 +32,9 @@ export async function runCleanup() {
   if (!cfg.enabled) return { skipped: 'disabled' };
 
   const minRatio = typeof cfg.ratio === 'number' ? cfg.ratio : 1.0;
+  const maxSeedSeconds = (typeof cfg.seedHours === 'number' ? cfg.seedHours : 12) * 3600;
   const deleteFiles = cfg.deleteFiles !== false;
+  const nowSec = Date.now() / 1000;
 
   let torrents;
   try {
@@ -45,25 +47,36 @@ export async function runCleanup() {
   try {
     busy = await busyHashes();
   } catch {
-    // if queues are unreachable, fall through with an empty busy set but still
-    // require ratio >= threshold, which already implies the download finished
+    // if queues are unreachable, fall through with an empty busy set
   }
 
   const removed = [];
   for (const t of torrents || []) {
     const hash = String(t.hash || '').toLowerCase();
     if (!isComplete(t)) continue;
-    if ((t.ratio ?? 0) < minRatio) continue;
     if (busy.has(hash)) continue;
+
+    // Remove once it has paid its dues: hit the ratio, OR seeded long enough
+    // (so a torrent with no peers can't sit there forever).
+    const ratioOk = (t.ratio ?? 0) >= minRatio;
+    const seededSec = t.completion_on > 0 ? nowSec - t.completion_on : 0;
+    const timeOk = maxSeedSeconds > 0 && seededSec >= maxSeedSeconds;
+    if (!ratioOk && !timeOk) continue;
+
     try {
       await qbit.remove(t.hash, deleteFiles);
-      removed.push({ name: t.name, ratio: t.ratio });
+      removed.push({ name: t.name, ratio: t.ratio, reason: ratioOk ? 'ratio' : 'time' });
     } catch (err) {
       console.error(`[cleanup] failed to remove ${t.name}:`, err.message);
     }
   }
 
-  lastRun = { at: new Date().toISOString(), removed: removed.length, ratio: minRatio };
+  lastRun = {
+    at: new Date().toISOString(),
+    removed: removed.length,
+    ratio: minRatio,
+    seedHours: maxSeedSeconds / 3600
+  };
   if (removed.length) {
     console.log(`[cleanup] removed ${removed.length} torrent(s) at ratio >= ${minRatio}`);
   }

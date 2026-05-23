@@ -45,7 +45,8 @@ function defaultConfig() {
     app: {
       cleanup: {
         enabled: false, // off by default — opt-in, never deletes silently
-        ratio: 1.0, // remove a completed torrent once it has seeded to this ratio
+        ratio: 1.0, // remove a completed torrent once it has seeded to this ratio…
+        seedHours: 12, // …OR after this many hours of seeding (so it can't seed forever)
         deleteFiles: true, // also delete the torrent's files (safe with hardlinks)
         intervalSeconds: 120
       }

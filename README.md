@@ -42,7 +42,8 @@ The app, in five areas:
    confirmation dialog + "delete files" checkbox).
 6. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
    as "Saved ✓"), test connections, optional **auto-cleanup** (remove a finished torrent once
-   it seeds to a chosen ratio, freeing space — skips anything still importing), and inspect
+   it hits a ratio **or** a max seed time — whichever first — freeing space; skips anything
+   still importing), and inspect
    health, versions, disk space, indexer status, providers, warnings, container logs/restart.
 
 Mobile-first and installable: open it on your phone and **Add to Home Screen** to run

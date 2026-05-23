@@ -184,9 +184,10 @@ function CleanupCard({ value, onChange }) {
         </button>
       </div>
       <p className="text-xs text-silver">
-        When on, a finished torrent is removed once it has seeded to the ratio below — and its
-        files deleted to free space (safe with hardlinks: your library stays intact). Torrents
-        Sonarr/Radarr are still importing are skipped.
+        When on, a finished torrent is removed once it hits the ratio <em>or</em> has seeded for
+        the hours below (whichever comes first — so a torrent with no peers can't seed forever) —
+        and its files deleted to free space (safe with hardlinks: your library stays intact).
+        Torrents Sonarr/Radarr are still importing are skipped.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
@@ -203,19 +204,31 @@ function CleanupCard({ value, onChange }) {
             onChange={(e) => onChange({ ...c, ratio: Number(e.target.value) })}
           />
         </label>
-        <label className="flex items-end pb-2.5">
-          <span className="flex items-center gap-2 text-sm text-parchment">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-gold"
-              checked={c.deleteFiles !== false}
-              disabled={!c.enabled}
-              onChange={(e) => onChange({ ...c, deleteFiles: e.target.checked })}
-            />
-            Delete files
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
+            …or after (hours)
           </span>
+          <input
+            type="number"
+            step="1"
+            min="0"
+            className="input"
+            value={c.seedHours ?? 12}
+            disabled={!c.enabled}
+            onChange={(e) => onChange({ ...c, seedHours: Number(e.target.value) })}
+          />
         </label>
       </div>
+      <label className="flex items-center gap-2 text-sm text-parchment">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-gold"
+          checked={c.deleteFiles !== false}
+          disabled={!c.enabled}
+          onChange={(e) => onChange({ ...c, deleteFiles: e.target.checked })}
+        />
+        Also delete files from disk
+      </label>
     </div>
   );
 }
