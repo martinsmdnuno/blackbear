@@ -118,6 +118,23 @@ export const movieRecommendations = (id) =>
 export const tvRecommendations = (id) =>
   get(`/tv/${id}/recommendations`).then((r) => (r?.results || []).map(mapTv));
 
+// Minimal details for one title, to label a hidden item by id.
+export async function details(type, id) {
+  const d = await get(type === 'movie' ? `/movie/${id}` : `/tv/${id}`);
+  if (!d) return null;
+  return type === 'movie'
+    ? {
+        title: d.title || d.original_title,
+        poster: d.poster_path ? IMG + d.poster_path : null,
+        year: d.release_date ? Number(d.release_date.slice(0, 4)) : null
+      }
+    : {
+        title: d.name || d.original_name,
+        poster: d.poster_path ? IMG + d.poster_path : null,
+        year: d.first_air_date ? Number(d.first_air_date.slice(0, 4)) : null
+      };
+}
+
 export { mapMovie, mapTv };
 
 // Cheap call to validate the API key for the diagnostics/test probe.

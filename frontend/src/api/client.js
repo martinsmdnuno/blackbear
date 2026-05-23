@@ -27,8 +27,14 @@ export const api = {
   pipeline: () => req('/pipeline'),
   trending: (mode = 'trending') => req(`/trending?mode=${mode}`),
   recommended: () => req('/trending/recommended'),
-  markSeen: (type, tmdbId) =>
-    req('/trending/seen', { method: 'POST', body: JSON.stringify({ type, tmdbId }) }),
+  seenList: () => req('/trending/seen'),
+  markSeen: (type, item) =>
+    req('/trending/seen', {
+      method: 'POST',
+      body: JSON.stringify({ type, tmdbId: item.tmdbId, title: item.title, poster: item.poster, year: item.year })
+    }),
+  unhide: (type, tmdbId) =>
+    req('/trending/seen', { method: 'DELETE', body: JSON.stringify({ type, tmdbId }) }),
 
   downloads: () => req('/downloads'),
   bazarrSearchWanted: () => req('/downloads/bazarr/search-wanted', { method: 'POST' }),

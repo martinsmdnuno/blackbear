@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Flame, TrendingUp, Sparkles, Film, Tv, Plus, Loader2, Star, EyeOff } from 'lucide-react';
+import { Flame, TrendingUp, Sparkles, Eye, Film, Tv, Plus, Loader2, Star, EyeOff } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
@@ -8,10 +8,11 @@ import { truncate } from '../lib/format.js';
 const MODES = [
   { id: 'trending', label: 'Trending', icon: Flame },
   { id: 'popular', label: 'Popular', icon: TrendingUp },
-  { id: 'recommended', label: 'For You', icon: Sparkles }
+  { id: 'recommended', label: 'For You', icon: Sparkles },
+  { id: 'watched', label: 'Watched', icon: Eye }
 ];
 
-function Card({ item, busy, onPick, onHide }) {
+function Card({ item, busy, onPick, onHide, onUnhide, seen }) {
   const Icon = item.type === 'movie' ? Film : Tv;
   return (
     <div className="card relative flex gap-3 p-3 transition hover:border-gold/50">
@@ -47,13 +48,23 @@ function Card({ item, busy, onPick, onHide }) {
           </p>
         </div>
       </button>
-      <button
-        onClick={onHide}
-        title="Already seen — hide"
-        className="absolute right-2 top-2 rounded-md p-1 text-silver transition hover:bg-night-800 hover:text-blood-light"
-      >
-        <EyeOff size={15} />
-      </button>
+      {seen ? (
+        <button
+          onClick={onUnhide}
+          title="Restore to Trending"
+          className="absolute right-2 top-2 rounded-md p-1 text-silver transition hover:bg-night-800 hover:text-gold-light"
+        >
+          <Eye size={15} />
+        </button>
+      ) : (
+        <button
+          onClick={onHide}
+          title="Already seen — hide"
+          className="absolute right-2 top-2 rounded-md p-1 text-silver transition hover:bg-night-800 hover:text-blood-light"
+        >
+          <EyeOff size={15} />
+        </button>
+      )}
     </div>
   );
 }
@@ -89,8 +100,15 @@ export default function TrendingTab() {
     setLoading(true);
     setData(null);
     try {
-      const res = m === 'recommended' ? await api.recommended() : await api.trending(m);
-      setData(res);
+      if (m === 'watched') {
+        const res = await api.seenList();
+        setData({
+          movies: (res.movie || []).map((x) => ({ ...x, type: 'movie' })),
+          series: (res.series || []).map((x) => ({ ...x, type: 'series' }))
+        });
+      } else {
+        setData(m === 'recommended' ? await api.recommended() : await api.trending(m));
+      }
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -128,7 +146,7 @@ export default function TrendingTab() {
   async function hide(item) {
     setHidden((h) => new Set(h).add(item.tmdbId));
     try {
-      await api.markSeen(item.type, item.tmdbId);
+      await api.markSeen(item.type, item);
     } catch (err) {
       toast.error(err.message);
       setHidden((h) => {
@@ -139,16 +157,39 @@ export default function TrendingTab() {
     }
   }
 
-  const movies = (data?.movies || []).filter((m) => !hidden.has(m.tmdbId));
-  const series = (data?.series || []).filter((s) => !hidden.has(s.tmdbId));
+  async function unhide(item) {
+    setData((d) => ({
+      movies: (d.movies || []).filter((x) => !(x.type === 'movie' && x.tmdbId === item.tmdbId)),
+      series: (d.series || []).filter((x) => !(x.type === 'series' && x.tmdbId === item.tmdbId))
+    }));
+    setHidden((h) => {
+      const n = new Set(h);
+      n.delete(item.tmdbId);
+      return n;
+    });
+    try {
+      await api.unhide(item.type, item.tmdbId);
+    } catch (err) {
+      toast.error(err.message);
+      load('watched');
+    }
+  }
+
+  const isWatched = mode === 'watched';
+  const movies = isWatched
+    ? data?.movies || []
+    : (data?.movies || []).filter((m) => !hidden.has(m.tmdbId));
+  const series = isWatched
+    ? data?.series || []
+    : (data?.series || []).filter((s) => !hidden.has(s.tmdbId));
   const isRecommended = mode === 'recommended';
-  const emptyRecommended =
-    isRecommended && data && !movies.length && !series.length;
+  const emptyRecommended = isRecommended && data && !movies.length && !series.length;
+  const emptyWatched = isWatched && data && !movies.length && !series.length;
 
   return (
     <div className="space-y-5">
-      {/* Trending / Popular / For You */}
-      <div className="grid grid-cols-3 gap-1 rounded-lg bg-night-850 p-1">
+      {/* Trending / Popular / For You / Watched */}
+      <div className="grid grid-cols-4 gap-1 rounded-lg bg-night-850 p-1">
         {MODES.map((t) => {
           const Icon = t.icon;
           const active = mode === t.id;
@@ -156,10 +197,10 @@ export default function TrendingTab() {
             <button
               key={t.id}
               onClick={() => setMode(t.id)}
-              className={`flex items-center justify-center gap-1.5 rounded-md py-2.5 text-sm font-semibold transition
+              className={`flex items-center justify-center gap-1 rounded-md py-2.5 text-xs font-semibold transition
                           ${active ? 'bg-gold text-night-950' : 'text-silver'}`}
             >
-              <Icon size={16} />
+              <Icon size={15} />
               {t.label}
             </button>
           );
@@ -197,11 +238,23 @@ export default function TrendingTab() {
         </p>
       )}
 
-      {data && !emptyRecommended && (
+      {emptyWatched && (
+        <p className="card p-6 text-center text-sm text-silver">
+          Nothing hidden. Titles you mark as seen (the eye-off button) show up here — tap the eye
+          to bring one back.
+        </p>
+      )}
+
+      {data && !emptyRecommended && !emptyWatched && (
         <>
           {isRecommended && data.basedOn && (
             <p className="px-1 text-xs text-silver">
               Based on {data.basedOn.movies} movies and {data.basedOn.series} series in your library.
+            </p>
+          )}
+          {isWatched && (
+            <p className="px-1 text-xs text-silver">
+              Hidden from Trending — tap the eye to restore, or the card to add anyway.
             </p>
           )}
           <Section title="Movies" count={movies.length} icon={Film}>
@@ -213,8 +266,10 @@ export default function TrendingTab() {
                   key={`m${m.tmdbId}`}
                   item={m}
                   busy={lookingUp === m.tmdbId}
+                  seen={isWatched}
                   onPick={() => pick(m)}
                   onHide={() => hide(m)}
+                  onUnhide={() => unhide(m)}
                 />
               ))
             )}
@@ -229,8 +284,10 @@ export default function TrendingTab() {
                   key={`s${s.tmdbId}`}
                   item={s}
                   busy={lookingUp === s.tmdbId}
+                  seen={isWatched}
                   onPick={() => pick(s)}
                   onHide={() => hide(s)}
+                  onUnhide={() => unhide(s)}
                 />
               ))
             )}
