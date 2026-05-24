@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Flame, TrendingUp, Sparkles, Eye, Film, Tv, Plus, Loader2, Star, EyeOff } from 'lucide-react';
+import {
+  Flame,
+  TrendingUp,
+  Sparkles,
+  Eye,
+  Film,
+  Tv,
+  Plus,
+  Loader2,
+  Star,
+  EyeOff,
+  Check
+} from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
@@ -12,7 +24,7 @@ const MODES = [
   { id: 'watched', label: 'Watched', icon: Eye }
 ];
 
-function Card({ item, busy, onPick, onHide, onUnhide, seen }) {
+function Card({ item, busy, onPick, onHide, onUnhide, seen, owned }) {
   const Icon = item.type === 'movie' ? Film : Tv;
   return (
     <div className="card relative flex gap-3 p-3 transition hover:border-gold/50">
@@ -39,9 +51,15 @@ function Card({ item, busy, onPick, onHide, onUnhide, seen }) {
                 <Star size={11} className="fill-gold-light" /> {item.rating}
               </span>
             ) : null}
-            <span className="inline-flex items-center gap-0.5 text-gold">
-              {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} add
-            </span>
+            {owned ? (
+              <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                <Check size={11} /> In library
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-0.5 text-gold">
+                {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} add
+              </span>
+            )}
           </div>
           <p className="mt-1.5 text-xs leading-relaxed text-silver">
             {truncate(item.overview, 120) || 'No synopsis available.'}
@@ -95,6 +113,14 @@ export default function TrendingTab() {
   const [lookingUp, setLookingUp] = useState(null);
   const [hidden, setHidden] = useState(new Set());
   const [selected, setSelected] = useState(null);
+  const [ownedIds, setOwnedIds] = useState({ movie: new Set(), series: new Set() });
+
+  useEffect(() => {
+    api
+      .libraryIds()
+      .then((d) => setOwnedIds({ movie: new Set(d.movie || []), series: new Set(d.series || []) }))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async (m) => {
     setLoading(true);
@@ -267,6 +293,7 @@ export default function TrendingTab() {
                   item={m}
                   busy={lookingUp === m.tmdbId}
                   seen={isWatched}
+                  owned={ownedIds.movie.has(m.tmdbId)}
                   onPick={() => pick(m)}
                   onHide={() => hide(m)}
                   onUnhide={() => unhide(m)}
@@ -285,6 +312,7 @@ export default function TrendingTab() {
                   item={s}
                   busy={lookingUp === s.tmdbId}
                   seen={isWatched}
+                  owned={ownedIds.series.has(s.tmdbId)}
                   onPick={() => pick(s)}
                   onHide={() => hide(s)}
                   onUnhide={() => unhide(s)}

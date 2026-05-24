@@ -4,6 +4,7 @@ import * as prowlarr from './prowlarr.js';
 import * as bazarr from './bazarr.js';
 import * as qbit from './qbittorrent.js';
 import * as tmdb from './tmdb.js';
+import * as jellyfin from './jellyfin.js';
 
 // A connectivity probe per service, returning a normalised
 // { ok, version, error } shape. Shared by the settings "Test connection"
@@ -29,6 +30,10 @@ const probes = {
   tmdb: async () => {
     await tmdb.ping();
     return null;
+  },
+  jellyfin: async () => {
+    const info = await jellyfin.systemInfo();
+    return info?.Version || null;
   }
 };
 

@@ -2,12 +2,20 @@ import { Router } from 'express';
 import * as tmdb from '../services/tmdb.js';
 import * as recommend from '../services/recommend.js';
 import { markSeen, unmarkSeen, seenSet, listSeen, enrichEntry } from '../services/seen.js';
+import * as jellyfin from '../services/jellyfin.js';
 
 const router = Router();
 
-function filterSeen(data) {
-  const movies = seenSet('movie');
-  const series = seenSet('series');
+// Hide both manually-hidden items and anything already watched in Jellyfin.
+async function filterSeen(data) {
+  let jf = { movie: new Set(), series: new Set() };
+  try {
+    jf = await jellyfin.watchedTmdb();
+  } catch {
+    // Jellyfin not configured / unreachable — just use the manual seen list
+  }
+  const movies = new Set([...seenSet('movie'), ...jf.movie]);
+  const series = new Set([...seenSet('series'), ...jf.series]);
   return {
     movies: (data.movies || []).filter((m) => !movies.has(m.tmdbId)),
     series: (data.series || []).filter((s) => !series.has(s.tmdbId))
@@ -19,7 +27,7 @@ router.get('/', async (req, res) => {
   const mode = req.query.mode === 'popular' ? 'popular' : 'trending';
   try {
     const data = await tmdb.discover(mode);
-    res.json({ mode, ...filterSeen(data) });
+    res.json({ mode, ...(await filterSeen(data)) });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
@@ -29,7 +37,7 @@ router.get('/', async (req, res) => {
 router.get('/recommended', async (req, res) => {
   try {
     const data = await recommend.recommend({ refresh: req.query.refresh === '1' });
-    res.json({ mode: 'recommended', ...filterSeen(data), basedOn: data.basedOn });
+    res.json({ mode: 'recommended', ...(await filterSeen(data)), basedOn: data.basedOn });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

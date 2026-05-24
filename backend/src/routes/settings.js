@@ -12,6 +12,7 @@ function sanitize(config) {
   for (const [name, cfg] of Object.entries(config.services)) {
     const safe = { url: cfg.url, container: cfg.container };
     if ('username' in cfg) safe.username = cfg.username;
+    if ('userId' in cfg) safe.userId = cfg.userId;
     if ('apiKey' in cfg) safe.apiKeyConfigured = Boolean(cfg.apiKey);
     if ('password' in cfg) safe.passwordConfigured = Boolean(cfg.password);
     out.services[name] = safe;

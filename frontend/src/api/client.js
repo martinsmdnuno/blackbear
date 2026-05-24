@@ -51,6 +51,8 @@ export const api = {
     req('/settings/test', { method: 'POST', body: JSON.stringify({ service }) }),
 
   library: () => req('/library'),
+  libraryIds: () => req('/library/ids'),
+  jellyfin: () => req('/jellyfin'),
   deleteMovie: (id, deleteFiles) =>
     req(`/library/movie/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`, { method: 'DELETE' }),
   deleteSeries: (id, deleteFiles) =>

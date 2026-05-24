@@ -23,23 +23,26 @@ Prowlarr, Bazarr and qBittorrent — behind one dark, pirate-themed interface.
 
 ## ✨ Features
 
-The app, in five areas:
+The app, in six areas:
 
 1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
-   monitor options. Results show the **IMDb/TMDb rating** so you can judge a title before
-   adding. A **Person** mode searches actors & directors (TMDb) and lists their filmography.
-2. **Trending** — what's hot to grab: **Trending** (this week), **Popular**, and **For You**
-   (recommendations from your Radarr/Sonarr history via TMDb). One-tap add that resolves each
-   title through Radarr/Sonarr, and a "hide" button to mark titles seen so they stop showing.
+   monitor options. Results show the **IMDb/TMDb rating** and an **"In library"** badge for
+   titles you already have. A **Person** mode searches actors & directors (TMDb) and lists
+   their filmography.
+2. **Trending** — what's hot to grab: **Trending** (this week), **Popular**, **For You**
+   (recommendations from your Radarr/Sonarr history via TMDb), and **Watched** (un-hide).
+   One-tap add, a "hide" button to mark titles seen, and titles already watched in Jellyfin are
+   auto-hidden. Already-owned titles are flagged.
 3. **Upcoming** — monitored titles awaiting release: movies with their digital/physical/
    cinema dates and series episodes by air date, each with an "in X days" countdown
    (from the Radarr/Sonarr calendars).
 4. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
    Bazarr wanted-subtitle counts, auto-refreshing every 5s. Includes a one-tap "Search
    wanted subtitles" that runs Bazarr's missing-subtitle tasks.
-5. **Library** — browse everything in Radarr/Sonarr (with size on disk, filterable), and
-   delete a title — removing it from the *arr and, optionally, its files from disk (with a
-   confirmation dialog + "delete files" checkbox).
+5. **Library** — browse everything in Radarr/Sonarr (size on disk, filterable). When Jellyfin
+   is connected: **Continue watching** + **Recently added** rows, a **Watched** badge and a
+   "watched only" filter (to find what's safe to delete). Delete a title removes it from the
+   *arr and, optionally, its files from disk (confirmation dialog + "delete files" checkbox).
 6. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
    as "Saved ✓"), test connections, optional **auto-cleanup** (remove a finished torrent once
    it hits a ratio **or** a max seed time — whichever first — freeing space; skips anything
@@ -166,6 +169,7 @@ Where to find each API key:
 | Bazarr      | Settings → General → **API Key** (header is `X-API-KEY`)                        |
 | qBittorrent | No API key — uses the Web UI **username + password** (default user `admin`)     |
 | TMDb        | themoviedb.org → account **Settings → API** → API Key (v3). Needed for Trending |
+| Jellyfin    | Jellyfin → Dashboard → **API Keys**. URL is usually `host.docker.internal:8096` or the LAN IP. Powers watch state |
 
 Secrets are write-only from the UI: the backend returns whether a key is set, never the
 value. Leaving a key field blank on save keeps the existing one.
@@ -183,6 +187,7 @@ PROWLARR_URL, PROWLARR_API_KEY, PROWLARR_CONTAINER
 BAZARR_URL, BAZARR_API_KEY, BAZARR_CONTAINER
 QBITTORRENT_URL, QBITTORRENT_USERNAME, QBITTORRENT_PASSWORD, QBITTORRENT_CONTAINER
 TMDB_URL, TMDB_API_KEY
+JELLYFIN_URL, JELLYFIN_API_KEY, JELLYFIN_USER_ID
 ```
 
 Once you save in the UI, `config.json` wins and the env seeds are ignored.
@@ -236,9 +241,17 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 
 | Method | Path                                       | Purpose                                       |
 |--------|--------------------------------------------|-----------------------------------------------|
-| GET    | `/api/library`                             | All Radarr movies + Sonarr series (with size) |
+| GET    | `/api/library`                             | All Radarr movies + Sonarr series (size + watched) |
+| GET    | `/api/library/ids`                         | Owned TMDb ids (to flag "in library" elsewhere) |
 | DELETE | `/api/library/movie/:id?deleteFiles=true`  | Delete a movie from Radarr (and disk)         |
 | DELETE | `/api/library/series/:id?deleteFiles=true` | Delete a series from Sonarr (and disk)        |
+
+### Jellyfin
+
+| Method | Path                          | Purpose                                              |
+|--------|-------------------------------|------------------------------------------------------|
+| GET    | `/api/jellyfin`               | Continue watching + recently added for the user      |
+| GET    | `/api/jellyfin/image/:id`     | Poster proxy (Jellyfin is LAN-only; streamed for remote) |
 
 ### Settings
 

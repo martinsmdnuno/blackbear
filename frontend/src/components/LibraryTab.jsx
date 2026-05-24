@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Film, Tv, Trash2, Loader2, RefreshCw, Search, CheckCircle2 } from 'lucide-react';
+import { Film, Tv, Trash2, Loader2, RefreshCw, Search, CheckCircle2, Eye } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import { bytes, truncate } from '../lib/format.js';
@@ -13,7 +13,10 @@ function DeleteDialog({ kind, item, onCancel, onConfirm }) {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
       <div className="card relative z-10 w-full max-w-sm animate-fade-in p-5">
         <h3 className="text-lg font-bold text-parchment">Delete from {svc}?</h3>
-        <p className="mt-1 text-sm text-silver">{truncate(item.title, 80)}{item.year ? ` (${item.year})` : ''}</p>
+        <p className="mt-1 text-sm text-silver">
+          {truncate(item.title, 80)}
+          {item.year ? ` (${item.year})` : ''}
+        </p>
         <label className="mt-4 flex items-start gap-2.5 text-sm text-parchment/90">
           <input
             type="checkbox"
@@ -25,7 +28,9 @@ function DeleteDialog({ kind, item, onCancel, onConfirm }) {
             Also delete files from disk
             {item.sizeOnDisk > 0 && <span className="text-silver"> ({bytes(item.sizeOnDisk)})</span>}
             <span className="mt-0.5 block text-[11px] text-silver">
-              {deleteFiles ? 'Permanently removes the files from /Volumes/ALBATROZ.' : 'Removes the entry but keeps the files on disk.'}
+              {deleteFiles
+                ? 'Permanently removes the files from /Volumes/ALBATROZ.'
+                : 'Removes the entry but keeps the files on disk.'}
             </span>
           </span>
         </label>
@@ -51,6 +56,39 @@ function DeleteDialog({ kind, item, onCancel, onConfirm }) {
   );
 }
 
+// Horizontal poster strip for Jellyfin rows (Continue watching / Recently added).
+function JellyRow({ title, items }) {
+  return (
+    <section className="space-y-2">
+      <h3 className="px-1 text-sm font-bold uppercase tracking-wide text-parchment/90">{title}</h3>
+      <div className="no-scrollbar flex gap-2.5 overflow-x-auto pb-1">
+        {items.map((it, i) => (
+          <div key={`${it.imageId}-${i}`} className="w-[92px] shrink-0">
+            <div className="relative h-[138px] w-[92px] overflow-hidden rounded-md bg-night-800">
+              <img
+                src={`/api/jellyfin/image/${it.imageId}`}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              {it.progress > 0 && (
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-black/50">
+                  <div className="h-full bg-gold" style={{ width: `${Math.min(it.progress, 100)}%` }} />
+                </div>
+              )}
+            </div>
+            <p className="mt-1 truncate text-[11px] text-parchment">{it.title}</p>
+            {it.sub ? <p className="truncate text-[10px] text-silver">{it.sub}</p> : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Row({ item, kind, onDelete }) {
   return (
     <div className="card flex items-center gap-3 p-2.5">
@@ -71,7 +109,14 @@ function Row({ item, kind, onDelete }) {
           {kind === 'series' && item.episodes != null && <span> · {item.episodes} eps</span>}
         </p>
       </div>
-      {item.monitored && <CheckCircle2 size={15} className="shrink-0 text-emerald-400/70" title="Monitored" />}
+      {item.watched && (
+        <span className="flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+          <Eye size={12} /> Watched
+        </span>
+      )}
+      {item.monitored && !item.watched && (
+        <CheckCircle2 size={15} className="shrink-0 text-emerald-400/60" title="Monitored" />
+      )}
       <button onClick={onDelete} className="btn-danger shrink-0 px-2.5 py-2">
         <Trash2 size={15} />
       </button>
@@ -83,9 +128,11 @@ export default function LibraryTab() {
   const toast = useToast();
   const [kind, setKind] = useState('movie');
   const [data, setData] = useState(null);
+  const [jelly, setJelly] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('');
+  const [watchedOnly, setWatchedOnly] = useState(false);
   const [pending, setPending] = useState(null);
 
   const load = useCallback(async () => {
@@ -103,14 +150,20 @@ export default function LibraryTab() {
 
   useEffect(() => {
     load();
+    // Jellyfin is best-effort: if not configured, the rows simply don't appear.
+    api
+      .jellyfin()
+      .then(setJelly)
+      .catch(() => setJelly(null));
   }, [load]);
 
   const section = kind === 'movie' ? data?.movies : data?.series;
   const items = useMemo(() => {
-    const list = section?.items || [];
+    let list = section?.items || [];
+    if (watchedOnly) list = list.filter((i) => i.watched);
     const q = filter.trim().toLowerCase();
     return q ? list.filter((i) => i.title.toLowerCase().includes(q)) : list;
-  }, [section, filter]);
+  }, [section, filter, watchedOnly]);
 
   async function confirmDelete(deleteFiles) {
     const it = pending;
@@ -131,8 +184,21 @@ export default function LibraryTab() {
     }
   }
 
+  const hasJelly = jelly && (jelly.continueWatching?.length || jelly.recentlyAdded?.length);
+
   return (
     <div className="space-y-4">
+      {hasJelly ? (
+        <>
+          {jelly.continueWatching?.length > 0 && (
+            <JellyRow title="Continue watching" items={jelly.continueWatching} />
+          )}
+          {jelly.recentlyAdded?.length > 0 && (
+            <JellyRow title="Recently added" items={jelly.recentlyAdded} />
+          )}
+        </>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-night-850 p-1">
         {[
           { id: 'movie', label: 'Movies', icon: Film },
@@ -164,6 +230,13 @@ export default function LibraryTab() {
             className="input pl-9"
           />
         </div>
+        <button
+          onClick={() => setWatchedOnly((v) => !v)}
+          title="Show only titles watched in Jellyfin"
+          className={`btn shrink-0 px-3 py-2.5 ${watchedOnly ? 'bg-gold text-night-950' : 'bg-night-700/70 text-parchment'}`}
+        >
+          <Eye size={16} /> Watched
+        </button>
         <button onClick={load} disabled={loading} className="btn-ghost px-3 py-2.5">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -190,6 +263,7 @@ export default function LibraryTab() {
         <>
           <p className="px-1 text-xs text-silver">
             {items.length} {kind === 'movie' ? 'movies' : 'series'}
+            {watchedOnly && ' watched'}
             {filter && ` matching “${filter}”`}
           </p>
           <div className="space-y-2">

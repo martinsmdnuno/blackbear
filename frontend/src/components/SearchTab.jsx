@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Film, Tv, User, Plus, Loader2, X, Star } from 'lucide-react';
+import { Search, Film, Tv, User, Plus, Loader2, X, Star, Check } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
@@ -26,13 +26,21 @@ function RatingBadge({ rating }) {
   );
 }
 
+function InLibraryBadge() {
+  return (
+    <span className="flex items-center gap-0.5 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+      <Check size={11} /> In library
+    </span>
+  );
+}
+
 const MODES = [
   { id: 'movie', label: 'Movie', icon: Film },
   { id: 'series', label: 'Series', icon: Tv },
   { id: 'person', label: 'Person', icon: User }
 ];
 
-function ResultCard({ item, onAdd }) {
+function ResultCard({ item, owned, onAdd }) {
   const poster = item.images?.find((i) => i.coverType === 'poster')?.remoteUrl;
   return (
     <button
@@ -55,9 +63,10 @@ function ResultCard({ item, onAdd }) {
             <Plus size={16} />
           </span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-silver">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-silver">
           <span>{item.year || 'Unknown year'}</span>
           <RatingBadge rating={pickRating(item.ratings)} />
+          {owned && <InLibraryBadge />}
         </div>
         <p className="mt-1.5 text-xs leading-relaxed text-silver">
           {truncate(item.overview, 140) || 'No synopsis available.'}
@@ -93,7 +102,7 @@ function PersonCard({ person, onOpen }) {
   );
 }
 
-function CreditCard({ item, busy, onAdd }) {
+function CreditCard({ item, busy, owned, onAdd }) {
   const Icon = item.type === 'movie' ? Film : Tv;
   return (
     <button
@@ -112,7 +121,7 @@ function CreditCard({ item, busy, onAdd }) {
       </div>
       <div className="min-w-0 flex-1">
         <h4 className="text-sm font-semibold leading-tight text-parchment">{item.title}</h4>
-        <div className="flex items-center gap-1.5 text-xs text-silver">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-silver">
           <span>{item.year || '—'}</span>
           <span className="text-gold-light">{item.role}</span>
           {item.rating ? (
@@ -120,6 +129,7 @@ function CreditCard({ item, busy, onAdd }) {
               <Star size={10} className="fill-gold-light" /> {item.rating}
             </span>
           ) : null}
+          {owned && <InLibraryBadge />}
         </div>
       </div>
       <span className="self-center text-gold">
@@ -129,7 +139,7 @@ function CreditCard({ item, busy, onAdd }) {
   );
 }
 
-function PersonModal({ person, onClose, onPick, lookingUp }) {
+function PersonModal({ person, onClose, onPick, lookingUp, ownedIds }) {
   const [credits, setCredits] = useState(null);
   const [error, setError] = useState(null);
 
@@ -182,7 +192,13 @@ function PersonModal({ person, onClose, onPick, lookingUp }) {
                 Movies ({movies.length})
               </h4>
               {movies.map((m) => (
-                <CreditCard key={`m${m.tmdbId}`} item={m} busy={lookingUp === m.tmdbId} onAdd={() => onPick(m)} />
+                <CreditCard
+                  key={`m${m.tmdbId}`}
+                  item={m}
+                  busy={lookingUp === m.tmdbId}
+                  owned={ownedIds?.movie?.has(m.tmdbId)}
+                  onAdd={() => onPick(m)}
+                />
               ))}
             </div>
           )}
@@ -192,7 +208,13 @@ function PersonModal({ person, onClose, onPick, lookingUp }) {
                 Series ({series.length})
               </h4>
               {series.map((s) => (
-                <CreditCard key={`s${s.tmdbId}`} item={s} busy={lookingUp === s.tmdbId} onAdd={() => onPick(s)} />
+                <CreditCard
+                  key={`s${s.tmdbId}`}
+                  item={s}
+                  busy={lookingUp === s.tmdbId}
+                  owned={ownedIds?.series?.has(s.tmdbId)}
+                  onAdd={() => onPick(s)}
+                />
               ))}
             </div>
           )}
@@ -213,7 +235,15 @@ export default function SearchTab() {
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [lookingUp, setLookingUp] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [ownedIds, setOwnedIds] = useState({ movie: new Set(), series: new Set() });
   const debounce = useRef(null);
+
+  useEffect(() => {
+    api
+      .libraryIds()
+      .then((d) => setOwnedIds({ movie: new Set(d.movie || []), series: new Set(d.series || []) }))
+      .catch(() => {});
+  }, []);
 
   function runSearch(q, m) {
     if (!q.trim()) {
@@ -338,6 +368,7 @@ export default function SearchTab() {
               <ResultCard
                 key={item.tmdbId || item.tvdbId || item.titleSlug}
                 item={item}
+                owned={item.id > 0}
                 onAdd={() => setSelected({ type: mode, item })}
               />
             ))}
@@ -357,6 +388,7 @@ export default function SearchTab() {
           onClose={() => setSelectedPerson(null)}
           onPick={resolveAndAdd}
           lookingUp={lookingUp}
+          ownedIds={ownedIds}
         />
       )}
 

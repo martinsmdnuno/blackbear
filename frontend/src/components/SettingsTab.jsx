@@ -25,7 +25,8 @@ const SERVICE_LABELS = {
   prowlarr: 'Prowlarr',
   bazarr: 'Bazarr',
   qbittorrent: 'qBittorrent',
-  tmdb: 'TMDb (Trending)'
+  tmdb: 'TMDb (Trending)',
+  jellyfin: 'Jellyfin'
 };
 
 // Services backed by a Docker container (i.e. that support restart/logs).
@@ -40,6 +41,7 @@ function ServiceForm({ name, value, onChange }) {
   const [result, setResult] = useState(null);
   const isQbit = name === 'qbittorrent';
   const isTmdb = name === 'tmdb';
+  const isJellyfin = name === 'jellyfin';
   const configured = value.apiKeyConfigured || value.passwordConfigured;
 
   async function test() {
@@ -136,7 +138,21 @@ function ServiceForm({ name, value, onChange }) {
         </label>
       )}
 
-      {!isTmdb && (
+      {isJellyfin && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
+            User ID <span className="normal-case text-silver/70">(optional)</span>
+          </span>
+          <input
+            className="input"
+            value={value.userId || ''}
+            onChange={(e) => onChange({ ...value, userId: e.target.value })}
+            placeholder="auto (first user)"
+          />
+        </label>
+      )}
+
+      {!isTmdb && !isJellyfin && (
         <label className="block">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
             Container name (for restart/logs)
@@ -152,6 +168,15 @@ function ServiceForm({ name, value, onChange }) {
       {isTmdb && (
         <p className="text-xs text-silver">
           Free API key from themoviedb.org → Settings → API. Powers the Trending tab.
+        </p>
+      )}
+
+      {isJellyfin && (
+        <p className="text-xs text-silver">
+          API key from Jellyfin → Dashboard → API Keys. Jellyfin runs on the host, so the URL is
+          usually <code className="rounded bg-night-800 px-1">http://host.docker.internal:8096</code>
+          {' '}or your LAN IP. Powers "Continue watching", the Library "watched" badge, and
+          auto-hiding watched titles in Trending.
         </p>
       )}
 

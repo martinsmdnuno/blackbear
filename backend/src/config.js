@@ -39,6 +39,14 @@ function defaultConfig() {
       tmdb: {
         url: process.env.TMDB_URL || 'https://api.themoviedb.org/3',
         apiKey: process.env.TMDB_API_KEY || ''
+      },
+      // Jellyfin runs natively on the host (not in the Docker network), so reach
+      // it via host.docker.internal (Docker Desktop) or the LAN IP. userId is
+      // optional — the backend falls back to the first user.
+      jellyfin: {
+        url: process.env.JELLYFIN_URL || 'http://host.docker.internal:8096',
+        apiKey: process.env.JELLYFIN_API_KEY || '',
+        userId: process.env.JELLYFIN_USER_ID || ''
       }
     },
     // Non-secret app behaviour (editable in Settings, persisted in config.json).
