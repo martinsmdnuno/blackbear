@@ -18,6 +18,10 @@ export const deleteMovie = (id, deleteFiles) =>
 
 export const queue = () => client.get('/queue?pageSize=100');
 
+// Remove a queue item, blocklisting the release so Radarr grabs a different one.
+export const removeQueueItem = (id) =>
+  client.del(`/queue/${id}?removeFromClient=true&blocklist=true&skipRedownload=false`);
+
 export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');

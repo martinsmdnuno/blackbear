@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Flame,
-  TrendingUp,
+  Clock,
   Sparkles,
   Eye,
   Film,
@@ -19,7 +19,7 @@ import { truncate } from '../lib/format.js';
 
 const MODES = [
   { id: 'trending', label: 'Trending', icon: Flame },
-  { id: 'popular', label: 'Popular', icon: TrendingUp },
+  { id: 'recent', label: 'Recent', icon: Clock },
   { id: 'recommended', label: 'For You', icon: Sparkles },
   { id: 'watched', label: 'Watched', icon: Eye }
 ];

@@ -9,8 +9,16 @@ const DATE_TYPE_LABEL = {
   cinema: 'In cinemas'
 };
 
-// Soonest items get a brighter, gold "in X days" pill; further-out ones stay muted.
-function whenPill(dateStr) {
+// Pill: amber for missing (released but not yet downloaded), gold for soon-coming,
+// muted silver otherwise.
+function whenPill(dateStr, missing) {
+  if (missing) {
+    return (
+      <span className="shrink-0 rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
+        Missing
+      </span>
+    );
+  }
   const days = Math.round((new Date(dateStr).getTime() - Date.now()) / 86400000);
   const soon = days <= 14;
   return (
@@ -45,7 +53,7 @@ function MovieCard({ m }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
           <p className="min-w-0 flex-1 font-semibold leading-tight text-parchment">{m.title}</p>
-          {whenPill(m.date)}
+          {whenPill(m.date, m.missing)}
         </div>
         <p className="text-xs text-silver">{m.year || ''}</p>
         <p className="mt-2 text-xs text-silver">
@@ -67,7 +75,7 @@ function EpisodeCard({ e }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
           <p className="min-w-0 flex-1 font-semibold leading-tight text-parchment">{e.series}</p>
-          {whenPill(e.date)}
+          {whenPill(e.date, e.missing)}
         </div>
         <p className="text-xs text-silver">
           <span className="text-gold-light">{code}</span>
@@ -125,7 +133,7 @@ export default function UpcomingTab() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-1.5 text-xs text-silver">
-          <CalendarClock size={14} /> Monitored titles awaiting release
+          <CalendarClock size={14} /> Missing now (amber) + upcoming releases
         </p>
         <button onClick={load} disabled={loading} className="btn-ghost px-3 py-1.5 text-xs">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />

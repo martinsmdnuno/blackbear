@@ -254,6 +254,46 @@ function CleanupCard({ value, onChange }) {
         />
         Also delete files from disk
       </label>
+
+      <hr className="border-gold/15" />
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-parchment">Re-grab stalled downloads</p>
+          <p className="mt-0.5 text-xs text-silver">
+            For torrents stalled longer than the minutes below, tell Sonarr/Radarr to blocklist
+            the release and search again — so a stuck download gets replaced automatically.
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label="toggle stalled re-grab"
+          onClick={() => onChange({ ...c, reGrabStalled: !c.reGrabStalled })}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+            c.reGrabStalled ? 'bg-gold' : 'bg-night-700'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
+              c.reGrabStalled ? 'left-[22px]' : 'left-0.5'
+            }`}
+          />
+        </button>
+      </div>
+      <label className="block">
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
+          Consider stalled after (minutes)
+        </span>
+        <input
+          type="number"
+          step="5"
+          min="10"
+          className="input"
+          value={c.stalledMinutes ?? 60}
+          disabled={!c.reGrabStalled}
+          onChange={(e) => onChange({ ...c, stalledMinutes: Number(e.target.value) })}
+        />
+      </label>
     </div>
   );
 }

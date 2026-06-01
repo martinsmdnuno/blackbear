@@ -22,9 +22,9 @@ async function filterSeen(data) {
   };
 }
 
-// GET /api/trending?mode=trending|popular
+// GET /api/trending?mode=trending|recent|popular
 router.get('/', async (req, res) => {
-  const mode = req.query.mode === 'popular' ? 'popular' : 'trending';
+  const mode = ['popular', 'recent'].includes(req.query.mode) ? req.query.mode : 'trending';
   try {
     const data = await tmdb.discover(mode);
     res.json({ mode, ...(await filterSeen(data)) });

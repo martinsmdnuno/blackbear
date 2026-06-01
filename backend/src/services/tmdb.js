@@ -40,12 +40,14 @@ function mapTv(t) {
   };
 }
 
-// mode: 'trending' (this week) | 'popular' (current popularity)
+// mode: 'trending' (this week) | 'recent' (now playing / on the air) | 'popular' (current popularity)
 export async function discover(mode = 'trending') {
   const [movie, tv] =
     mode === 'popular'
       ? ['/movie/popular', '/tv/popular']
-      : ['/trending/movie/week', '/trending/tv/week'];
+      : mode === 'recent'
+        ? ['/movie/now_playing', '/tv/on_the_air']
+        : ['/trending/movie/week', '/trending/tv/week'];
   const [mv, series] = await Promise.all([get(movie), get(tv)]);
   return {
     movies: (mv?.results || []).map(mapMovie),

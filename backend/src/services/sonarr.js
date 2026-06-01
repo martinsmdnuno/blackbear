@@ -19,11 +19,21 @@ export const deleteSeries = (id, deleteFiles) =>
 export const queue = () =>
   client.get('/queue?includeUnknownSeriesItems=true&pageSize=100');
 
+// Remove a queue item, blocklisting the release so Sonarr grabs a different one.
+export const removeQueueItem = (id) =>
+  client.del(`/queue/${id}?removeFromClient=true&blocklist=true&skipRedownload=false`);
+
 export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');
 
 export const calendar = (start, end) =>
   client.get(`/calendar?start=${start}&end=${end}&unmonitored=false&includeSeries=true`);
+
+// Aired but not downloaded yet (paginated, large pageSize so we get most).
+export const missing = (pageSize = 200) =>
+  client.get(
+    `/wanted/missing?page=1&pageSize=${pageSize}&sortKey=airDateUtc&sortDirection=descending&monitored=true&includeSeries=true`
+  );
 
 export default client;

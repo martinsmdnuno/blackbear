@@ -56,6 +56,8 @@ function defaultConfig() {
         ratio: 1.0, // remove a completed torrent once it has seeded to this ratio…
         seedHours: 12, // …OR after this many hours of seeding (so it can't seed forever)
         deleteFiles: true, // also delete the torrent's files (safe with hardlinks)
+        reGrabStalled: false, // re-grab stalled torrents via Sonarr/Radarr (blocklist + re-search)
+        stalledMinutes: 60, // a torrent stalled for at least this long is considered stuck
         intervalSeconds: 120
       }
     }

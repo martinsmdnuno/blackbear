@@ -16,16 +16,17 @@
   }
 }
 
-/* iOS zooms when a focused field is < 16px. Keep form controls at 16px on
-   phones so focusing an input never triggers a zoom. Unlayered so it beats the
-   `.input { text-sm }` defined in @layer components. */
-@media (max-width: 767px) {
-  input,
-  select,
-  textarea,
-  .input {
-    font-size: 16px;
-  }
+/* iOS/iPadOS zooms in when a focused field's font-size is < 16px. Force every
+   form control to 16px (on any viewport — iPads, foldables, etc.) so focusing
+   an input never triggers a zoom. Unlayered so it beats `.input { text-sm }`
+   defined in @layer components. `touch-action: manipulation` also disables the
+   double-tap-to-zoom heuristic on inputs. */
+input,
+select,
+textarea,
+.input {
+  font-size: 16px;
+  touch-action: manipulation;
 }
 
 @layer components {

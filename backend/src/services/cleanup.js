@@ -71,16 +71,56 @@ export async function runCleanup() {
     }
   }
 
+  // Re-grab any torrents that have been stalled too long — delete the arr queue
+  // item with blocklist=true so Sonarr/Radarr search for a different release.
+  const regrabbed = [];
+  if (cfg.reGrabStalled) {
+    const stalledMin = Math.max(10, Number(cfg.stalledMinutes) || 60);
+    const stalledSec = stalledMin * 60;
+    const stuckHashes = new Set();
+    for (const t of torrents || []) {
+      const isStalled = t.state === 'stalledDL' || t.state === 'metaDL';
+      const age = nowSec - (t.added_on || 0);
+      if (isStalled && age >= stalledSec && (t.progress || 0) < 1) {
+        stuckHashes.add(String(t.hash || '').toLowerCase());
+      }
+    }
+    if (stuckHashes.size) {
+      const [sq, rq] = await Promise.allSettled([sonarr.queue(), radarr.queue()]);
+      const buckets = [
+        ['sonarr', sq, sonarr.removeQueueItem],
+        ['radarr', rq, radarr.removeQueueItem]
+      ];
+      for (const [svc, q, remove] of buckets) {
+        if (q.status !== 'fulfilled') continue;
+        for (const r of q.value?.records || []) {
+          const id = r.downloadId && String(r.downloadId).toLowerCase();
+          if (!id || !stuckHashes.has(id)) continue;
+          try {
+            await remove(r.id);
+            regrabbed.push({ svc, name: r.title });
+          } catch (err) {
+            console.error(`[stalled] ${svc} failed to re-grab ${r.id}:`, err.message);
+          }
+        }
+      }
+      if (regrabbed.length) {
+        console.log(`[stalled] re-grabbing ${regrabbed.length} stalled torrent(s) past ${stalledMin}m`);
+      }
+    }
+  }
+
   lastRun = {
     at: new Date().toISOString(),
     removed: removed.length,
+    regrabbed: regrabbed.length,
     ratio: minRatio,
     seedHours: maxSeedSeconds / 3600
   };
   if (removed.length) {
     console.log(`[cleanup] removed ${removed.length} torrent(s) at ratio >= ${minRatio}`);
   }
-  return { removed, ...lastRun };
+  return { removed, regrabbed, ...lastRun };
 }
 
 export function getLastRun() {
