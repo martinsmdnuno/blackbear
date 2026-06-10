@@ -23,6 +23,13 @@ export const queue = () =>
 export const removeQueueItem = (id) =>
   client.del(`/queue/${id}?removeFromClient=true&blocklist=true&skipRedownload=false`);
 
+// Trigger an indexer search for specific episodes / a whole season.
+export const searchEpisodes = (episodeIds) =>
+  client.post('/command', { name: 'EpisodeSearch', episodeIds });
+
+export const searchSeason = (seriesId, seasonNumber) =>
+  client.post('/command', { name: 'SeasonSearch', seriesId, seasonNumber });
+
 export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');

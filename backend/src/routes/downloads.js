@@ -37,6 +37,7 @@ function mapTorrent(t) {
 function mapQueueRecord(r) {
   return {
     id: r.id,
+    downloadId: r.downloadId || null,
     title: r.title,
     status: r.status,
     trackedDownloadState: r.trackedDownloadState,

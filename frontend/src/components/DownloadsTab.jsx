@@ -8,6 +8,7 @@ import {
   Clock,
   Users,
   RefreshCw,
+  RotateCcw,
   Loader2,
   Captions,
   X
@@ -122,7 +123,7 @@ function TorrentCard({ t, busy, onToggle, onDelete }) {
   );
 }
 
-function QueueCard({ item }) {
+function QueueCard({ item, busy, onRenew }) {
   return (
     <div className="card p-3">
       <div className="flex items-start gap-2">
@@ -134,6 +135,40 @@ function QueueCard({ item }) {
       {item.errorMessage && (
         <p className="mt-1 text-xs text-blood-light">{truncate(item.errorMessage, 100)}</p>
       )}
+      <button
+        onClick={onRenew}
+        disabled={busy}
+        className="btn-ghost mt-2 px-2.5 py-1.5 text-xs"
+        title="Drop this download, blocklist the release and search for another"
+      >
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+        Renew
+      </button>
+    </div>
+  );
+}
+
+function RenewDialog({ item, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
+      <div className="card relative z-10 w-full max-w-sm animate-fade-in p-5">
+        <h3 className="text-lg font-bold text-parchment">Renew download?</h3>
+        <p className="mt-1 text-sm text-silver">{truncate(item.title, 80)}</p>
+        <p className="mt-3 text-sm text-silver">
+          The current download and its files are removed, the release is blocklisted, and a search
+          for a different release starts immediately.
+        </p>
+        <div className="mt-5 flex gap-2">
+          <button onClick={onCancel} className="btn-ghost flex-1">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="btn-danger flex-1">
+            <RotateCcw size={16} />
+            Renew
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -175,6 +210,8 @@ export default function DownloadsTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyHash, setBusyHash] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [pendingRenew, setPendingRenew] = useState(null);
+  const [busyQueueId, setBusyQueueId] = useState(null);
   const [searchingSubs, setSearchingSubs] = useState(false);
   const [pull, setPull] = useState(0);
   const pullStart = useRef(null);
@@ -245,6 +282,21 @@ export default function DownloadsTab() {
       toast.error(err.message);
     } finally {
       setSearchingSubs(false);
+    }
+  }
+
+  async function confirmRenew() {
+    const { service, item } = pendingRenew;
+    setPendingRenew(null);
+    setBusyQueueId(item.id);
+    try {
+      await api.renewQueue(service, item.id, item.downloadId);
+      toast.success('Release blocklisted — searching for another');
+      await load(true);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusyQueueId(null);
     }
   }
 
@@ -340,7 +392,14 @@ export default function DownloadsTab() {
             ) : radarrQ.length === 0 ? (
               <p className="card p-3 text-center text-sm text-silver">Nothing awaiting import.</p>
             ) : (
-              radarrQ.map((item) => <QueueCard key={item.id} item={item} />)
+              radarrQ.map((item) => (
+                <QueueCard
+                  key={item.id}
+                  item={item}
+                  busy={busyQueueId === item.id}
+                  onRenew={() => setPendingRenew({ service: 'radarr', item })}
+                />
+              ))
             )}
           </Section>
 
@@ -352,7 +411,14 @@ export default function DownloadsTab() {
             ) : sonarrQ.length === 0 ? (
               <p className="card p-3 text-center text-sm text-silver">Nothing awaiting import.</p>
             ) : (
-              sonarrQ.map((item) => <QueueCard key={item.id} item={item} />)
+              sonarrQ.map((item) => (
+                <QueueCard
+                  key={item.id}
+                  item={item}
+                  busy={busyQueueId === item.id}
+                  onRenew={() => setPendingRenew({ service: 'sonarr', item })}
+                />
+              ))
             )}
           </Section>
 
@@ -396,6 +462,14 @@ export default function DownloadsTab() {
           torrent={pendingDelete}
           onCancel={() => setPendingDelete(null)}
           onConfirm={confirmDelete}
+        />
+      )}
+
+      {pendingRenew && (
+        <RenewDialog
+          item={pendingRenew.item}
+          onCancel={() => setPendingRenew(null)}
+          onConfirm={confirmRenew}
         />
       )}
     </div>

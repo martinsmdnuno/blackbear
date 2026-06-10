@@ -36,6 +36,16 @@ export const api = {
   unhide: (type, tmdbId) =>
     req('/trending/seen', { method: 'DELETE', body: JSON.stringify({ type, tmdbId }) }),
 
+  renewEpisode: (id) => req(`/renew/episode/${id}`, { method: 'POST' }),
+  renewSeason: (seriesId, seasonNumber) =>
+    req('/renew/season', { method: 'POST', body: JSON.stringify({ seriesId, seasonNumber }) }),
+  renewMovie: (id) => req(`/renew/movie/${id}`, { method: 'POST' }),
+  renewQueue: (service, id, downloadId) =>
+    req(`/renew/queue/${service}/${id}`, {
+      method: 'POST',
+      body: JSON.stringify({ downloadId })
+    }),
+
   downloads: () => req('/downloads'),
   bazarrSearchWanted: () => req('/downloads/bazarr/search-wanted', { method: 'POST' }),
   torrentPause: (hash) => req(`/downloads/torrents/${hash}/pause`, { method: 'POST' }),

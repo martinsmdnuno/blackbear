@@ -22,6 +22,10 @@ export const queue = () => client.get('/queue?pageSize=100');
 export const removeQueueItem = (id) =>
   client.del(`/queue/${id}?removeFromClient=true&blocklist=true&skipRedownload=false`);
 
+// Trigger an indexer search for specific movies.
+export const searchMovies = (movieIds) =>
+  client.post('/command', { name: 'MoviesSearch', movieIds });
+
 export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');

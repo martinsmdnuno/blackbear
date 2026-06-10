@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Film, Tv, RefreshCw, CalendarClock } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Film, Tv, RefreshCw, CalendarClock, Search, RotateCcw, Loader2 } from 'lucide-react';
 import { api } from '../api/client.js';
+import { useToast } from './Toast.jsx';
 import { truncate, untilLabel, shortDate } from '../lib/format.js';
 
 const DATE_TYPE_LABEL = {
@@ -9,17 +10,36 @@ const DATE_TYPE_LABEL = {
   cinema: 'In cinemas'
 };
 
-// Pill: amber for missing (released but not yet downloaded), gold for soon-coming,
-// muted silver otherwise.
-function whenPill(dateStr, missing) {
-  if (missing) {
+// Pill for a missing item, split by what's actually wrong:
+//   - "Stalled"     (amber) — a download exists but isn't moving
+//   - "Downloading" (sky)   — a download is in progress, no action needed
+//   - "No sources"  (red)   — nothing found on the indexers yet
+function missingPill(queue) {
+  if (queue?.state === 'stalled') {
     return (
       <span className="shrink-0 rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
-        Missing
+        Stalled
       </span>
     );
   }
-  const days = Math.round((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  if (queue) {
+    return (
+      <span className="shrink-0 rounded-md bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-300">
+        Downloading
+      </span>
+    );
+  }
+  return (
+    <span className="shrink-0 rounded-md bg-blood/20 px-2 py-0.5 text-[11px] font-semibold text-blood-light">
+      No sources
+    </span>
+  );
+}
+
+// Pill: missing states above, gold for soon-coming, muted silver otherwise.
+function whenPill(item) {
+  if (item.missing) return missingPill(item.queue);
+  const days = Math.round((new Date(item.date).getTime() - Date.now()) / 86400000);
   const soon = days <= 14;
   return (
     <span
@@ -27,8 +47,33 @@ function whenPill(dateStr, missing) {
         soon ? 'bg-gold/20 text-gold-light' : 'bg-night-700 text-silver'
       }`}
     >
-      {untilLabel(dateStr)}
+      {untilLabel(item.date)}
     </span>
+  );
+}
+
+// Search again (no sources) or renew the stuck download (stalled). Hidden while
+// a healthy download is in progress.
+function RenewAction({ item, busy, onSearch, onRenew }) {
+  if (!item.missing) return null;
+  if (item.queue && item.queue.state !== 'stalled') return null;
+  const stalled = item.queue?.state === 'stalled';
+  return (
+    <button
+      onClick={stalled ? onRenew : onSearch}
+      disabled={busy}
+      className="btn-ghost mt-2 px-2.5 py-1.5 text-xs"
+      title={stalled ? 'Drop the stuck download, blocklist it and search again' : 'Search indexers now'}
+    >
+      {busy ? (
+        <Loader2 size={13} className="animate-spin" />
+      ) : stalled ? (
+        <RotateCcw size={13} />
+      ) : (
+        <Search size={13} />
+      )}
+      {stalled ? 'Renew' : 'Search'}
+    </button>
   );
 }
 
@@ -46,14 +91,14 @@ function Poster({ src, fallback: Fallback }) {
   );
 }
 
-function MovieCard({ m }) {
+function MovieCard({ m, busy, onSearch, onRenew }) {
   return (
     <div className="card flex gap-3 p-3">
       <Poster src={m.poster} fallback={Film} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
           <p className="min-w-0 flex-1 font-semibold leading-tight text-parchment">{m.title}</p>
-          {whenPill(m.date, m.missing)}
+          {whenPill(m)}
         </div>
         <p className="text-xs text-silver">{m.year || ''}</p>
         <p className="mt-2 text-xs text-silver">
@@ -62,12 +107,13 @@ function MovieCard({ m }) {
           </span>
           <span className="ml-2">{shortDate(m.date)}</span>
         </p>
+        <RenewAction item={m} busy={busy} onSearch={onSearch} onRenew={onRenew} />
       </div>
     </div>
   );
 }
 
-function EpisodeCard({ e }) {
+function EpisodeCard({ e, busy, onSearch, onRenew }) {
   const code = `S${String(e.season).padStart(2, '0')}E${String(e.episode).padStart(2, '0')}`;
   return (
     <div className="card flex gap-3 p-3">
@@ -75,14 +121,41 @@ function EpisodeCard({ e }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
           <p className="min-w-0 flex-1 font-semibold leading-tight text-parchment">{e.series}</p>
-          {whenPill(e.date, e.missing)}
+          {whenPill(e)}
         </div>
         <p className="text-xs text-silver">
           <span className="text-gold-light">{code}</span>
           {e.title ? ` · ${truncate(e.title, 40)}` : ''}
         </p>
         <p className="mt-2 text-xs text-silver">{shortDate(e.date)}</p>
+        <RenewAction item={e} busy={busy} onSearch={onSearch} onRenew={onRenew} />
       </div>
+    </div>
+  );
+}
+
+// One chip per season with 2+ missing episodes: a single SeasonSearch command
+// covers season packs and is far lighter on indexers than per-episode searches.
+function SeasonChips({ groups, busyKey, onSearch }) {
+  if (!groups.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {groups.map((g) => (
+        <button
+          key={g.key}
+          onClick={() => onSearch(g)}
+          disabled={busyKey === g.key}
+          className="btn-ghost px-2.5 py-1.5 text-xs"
+          title={`Search the whole season on the indexers (${g.count} missing episodes)`}
+        >
+          {busyKey === g.key ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <Search size={13} />
+          )}
+          {truncate(g.series, 24)} · S{String(g.season).padStart(2, '0')} ({g.count})
+        </button>
+      ))}
     </div>
   );
 }
@@ -105,9 +178,11 @@ function Section({ title, count, icon: Icon, children }) {
 }
 
 export default function UpcomingTab() {
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [busyKey, setBusyKey] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,11 +204,60 @@ export default function UpcomingTab() {
   const movies = data?.movies?.items || [];
   const episodes = data?.episodes?.items || [];
 
+  // Seasons with 2+ missing episodes still lacking an active download.
+  const seasonGroups = useMemo(() => {
+    const map = new Map();
+    for (const e of episodes) {
+      if (!e.missing || e.queue) continue;
+      const key = `${e.seriesId}:${e.season}`;
+      const g = map.get(key) || { key, seriesId: e.seriesId, series: e.series, season: e.season, count: 0 };
+      g.count += 1;
+      map.set(key, g);
+    }
+    return [...map.values()].filter((g) => g.count >= 2).sort((a, b) => b.count - a.count);
+  }, [episodes]);
+
+  async function run(key, fn, successMsg) {
+    setBusyKey(key);
+    try {
+      await fn();
+      toast.success(successMsg);
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  const searchMovie = (m) =>
+    run(`movie:${m.id}`, () => api.renewMovie(m.id), `Searching indexers for "${m.title}"`);
+  const renewMovie = (m) =>
+    run(
+      `movie:${m.id}`,
+      () => api.renewQueue('radarr', m.queue.id, m.queue.downloadId),
+      `Renewing "${m.title}" — old download blocklisted, searching again`
+    );
+  const searchEpisode = (e) =>
+    run(`ep:${e.id}`, () => api.renewEpisode(e.id), `Searching indexers for ${e.series}`);
+  const renewEpisode = (e) =>
+    run(
+      `ep:${e.id}`,
+      () => api.renewQueue('sonarr', e.queue.id, e.queue.downloadId),
+      `Renewing ${e.series} — old download blocklisted, searching again`
+    );
+  const searchSeason = (g) =>
+    run(
+      g.key,
+      () => api.renewSeason(g.seriesId, g.season),
+      `Searching season ${g.season} of ${g.series}`
+    );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-1.5 text-xs text-silver">
-          <CalendarClock size={14} /> Missing now (amber) + upcoming releases
+          <CalendarClock size={14} /> No sources (red) · stalled (amber) + upcoming
         </p>
         <button onClick={load} disabled={loading} className="btn-ghost px-3 py-1.5 text-xs">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -174,7 +298,15 @@ export default function UpcomingTab() {
                 Nothing on the horizon — no monitored movies awaiting release.
               </p>
             ) : (
-              movies.map((m) => <MovieCard key={m.id} m={m} />)
+              movies.map((m) => (
+                <MovieCard
+                  key={m.id}
+                  m={m}
+                  busy={busyKey === `movie:${m.id}`}
+                  onSearch={() => searchMovie(m)}
+                  onRenew={() => renewMovie(m)}
+                />
+              ))
             )}
           </Section>
 
@@ -188,7 +320,18 @@ export default function UpcomingTab() {
                 No upcoming episodes scheduled.
               </p>
             ) : (
-              episodes.map((e) => <EpisodeCard key={e.id} e={e} />)
+              <>
+                <SeasonChips groups={seasonGroups} busyKey={busyKey} onSearch={searchSeason} />
+                {episodes.map((e) => (
+                  <EpisodeCard
+                    key={e.id}
+                    e={e}
+                    busy={busyKey === `ep:${e.id}`}
+                    onSearch={() => searchEpisode(e)}
+                    onRenew={() => renewEpisode(e)}
+                  />
+                ))}
+              </>
             )}
           </Section>
         </>

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as radarr from '../services/radarr.js';
 import * as sonarr from '../services/sonarr.js';
+import * as qbit from '../services/qbittorrent.js';
 
 const router = Router();
 
@@ -44,6 +45,30 @@ function movieReleasePast(m) {
   return { date: c[0].d, type: c[0].type };
 }
 
+// Classify a missing item's *arr queue record (if any) so the UI can tell
+// "stalled download" apart from "no sources found". The qBittorrent state is
+// the most reliable stalled signal; fall back to the queue record's own
+// warning status when the torrent isn't visible.
+function queueInfo(record, torrentStates) {
+  if (!record) return null;
+  const hash = record.downloadId ? String(record.downloadId).toLowerCase() : null;
+  const tState = hash ? torrentStates.get(hash) : null;
+  const messages = (record.statusMessages || [])
+    .flatMap((m) => [m.title, ...(m.messages || [])])
+    .join('; ');
+  const stalled =
+    tState === 'stalledDL' ||
+    tState === 'metaDL' ||
+    record.status === 'warning' ||
+    record.trackedDownloadStatus === 'warning' ||
+    /stall/i.test(record.errorMessage || messages);
+  return {
+    id: record.id,
+    downloadId: record.downloadId || null,
+    state: stalled ? 'stalled' : 'downloading'
+  };
+}
+
 // GET /api/pipeline?movieDays=365&episodeDays=90
 //
 // Returns two arrays — movies and episodes — each combining:
@@ -57,12 +82,29 @@ router.get('/', async (req, res) => {
   const movieEnd = new Date(now + movieDays * 86400000).toISOString();
   const episodeEnd = new Date(now + episodeDays * 86400000).toISOString();
 
-  const [calMovies, calEpisodes, allMovies, missingEps] = await Promise.all([
-    settle(() => radarr.calendar(start, movieEnd), []),
-    settle(() => sonarr.calendar(start, episodeEnd), []),
-    settle(radarr.allMovies, []),
-    settle(sonarr.missing, { records: [] })
-  ]);
+  const [calMovies, calEpisodes, allMovies, missingEps, sonarrQ, radarrQ, torrents] =
+    await Promise.all([
+      settle(() => radarr.calendar(start, movieEnd), []),
+      settle(() => sonarr.calendar(start, episodeEnd), []),
+      settle(radarr.allMovies, []),
+      settle(sonarr.missing, { records: [] }),
+      settle(sonarr.queue, { records: [] }),
+      settle(radarr.queue, { records: [] }),
+      settle(qbit.listTorrents, [])
+    ]);
+
+  // hash -> qBittorrent state, to spot stalled downloads behind queue items.
+  const torrentStates = new Map(
+    (torrents.data || []).map((t) => [String(t.hash || '').toLowerCase(), t.state])
+  );
+  const episodeQueue = new Map();
+  for (const r of sonarrQ.data?.records || []) {
+    if (r.episodeId != null) episodeQueue.set(r.episodeId, r);
+  }
+  const movieQueue = new Map();
+  for (const r of radarrQ.data?.records || []) {
+    if (r.movieId != null) movieQueue.set(r.movieId, r);
+  }
 
   // Upcoming movies (calendar, future).
   const upcomingMovies = (calMovies.data || [])
@@ -102,7 +144,8 @@ router.get('/', async (req, res) => {
             monitored: true,
             date: rel.date,
             dateType: rel.type,
-            missing: true
+            missing: true,
+            queue: queueInfo(movieQueue.get(m.id), torrentStates)
           }
         : null;
     })
@@ -140,7 +183,8 @@ router.get('/', async (req, res) => {
       title: e.title,
       monitored: e.monitored,
       date: e.airDateUtc,
-      missing: true
+      missing: true,
+      queue: queueInfo(episodeQueue.get(e.id), torrentStates)
     }));
 
   res.json({
