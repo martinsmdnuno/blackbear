@@ -30,6 +30,23 @@ export const searchEpisodes = (episodeIds) =>
 export const searchSeason = (seriesId, seasonNumber) =>
   client.post('/command', { name: 'SeasonSearch', seriesId, seasonNumber });
 
+// Interactive search: list every candidate release instead of letting Sonarr
+// auto-pick. Queries all indexers synchronously, so it needs a long timeout.
+const RELEASE_TIMEOUT = 90000;
+
+export const episodeReleases = (episodeId) =>
+  client.get(`/release?episodeId=${episodeId}`, { timeout: RELEASE_TIMEOUT });
+
+export const seasonReleases = (seriesId, seasonNumber) =>
+  client.get(`/release?seriesId=${seriesId}&seasonNumber=${seasonNumber}`, {
+    timeout: RELEASE_TIMEOUT
+  });
+
+// Grab a specific release from the last search (Sonarr resolves guid+indexerId
+// against its release cache, so this must follow a recent releases() call).
+export const grabRelease = (guid, indexerId) =>
+  client.post('/release', { guid, indexerId }, { timeout: RELEASE_TIMEOUT });
+
 export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');

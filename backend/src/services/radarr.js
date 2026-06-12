@@ -26,6 +26,18 @@ export const removeQueueItem = (id) =>
 export const searchMovies = (movieIds) =>
   client.post('/command', { name: 'MoviesSearch', movieIds });
 
+// Interactive search: list every candidate release instead of letting Radarr
+// auto-pick. Queries all indexers synchronously, so it needs a long timeout.
+const RELEASE_TIMEOUT = 90000;
+
+export const movieReleases = (movieId) =>
+  client.get(`/release?movieId=${movieId}`, { timeout: RELEASE_TIMEOUT });
+
+// Grab a specific release from the last search (Radarr resolves guid+indexerId
+// against its release cache, so this must follow a recent releases() call).
+export const grabRelease = (guid, indexerId) =>
+  client.post('/release', { guid, indexerId }, { timeout: RELEASE_TIMEOUT });
+
 export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');

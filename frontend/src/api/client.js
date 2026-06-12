@@ -46,6 +46,16 @@ export const api = {
       body: JSON.stringify({ downloadId })
     }),
 
+  movieReleases: (id) => req(`/releases/movie/${id}`),
+  episodeReleases: (id) => req(`/releases/episode/${id}`),
+  seasonReleases: (seriesId, seasonNumber) =>
+    req(`/releases/season?seriesId=${seriesId}&seasonNumber=${seasonNumber}`),
+  grabRelease: (service, release) =>
+    req('/releases/grab', {
+      method: 'POST',
+      body: JSON.stringify({ service, guid: release.guid, indexerId: release.indexerId })
+    }),
+
   downloads: () => req('/downloads'),
   bazarrSearchWanted: () => req('/downloads/bazarr/search-wanted', { method: 'POST' }),
   torrentPause: (hash) => req(`/downloads/torrents/${hash}/pause`, { method: 'POST' }),

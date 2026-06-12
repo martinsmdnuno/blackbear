@@ -40,7 +40,7 @@ committed work — just a menu. Rough effort tags: **(S)** small, **(M)** medium
 - **Queue actions** — retry / remove / change of stuck Sonarr/Radarr queue items from the app. **(S)**
 - **Low-disk alerts** — you already show disk space; alert (push) when a drive crosses a threshold. **(S)**
 - **qBittorrent speed toggle** — flip alternative speed limits / schedule from the app. **(S)**
-- **Manual search / interactive grab** — pick a specific release for a wanted item. **(M)**
+- ~~**Manual search / interactive grab** — pick a specific release for a wanted item.~~ **Done** — "Pick" on Upcoming cards/season chips opens a release picker (seeders, size, quality, rejection reasons) with force-grab.
 
 ## Library
 

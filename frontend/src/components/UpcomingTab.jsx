@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Film, Tv, RefreshCw, CalendarClock, Search, RotateCcw, Loader2 } from 'lucide-react';
+import { Film, Tv, RefreshCw, CalendarClock, Search, RotateCcw, Loader2, ScanSearch } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
+import ReleasePickerSheet from './ReleasePickerSheet.jsx';
 import { truncate, untilLabel, shortDate } from '../lib/format.js';
 
 const DATE_TYPE_LABEL = {
@@ -52,28 +53,41 @@ function whenPill(item) {
   );
 }
 
-// Search again (no sources) or renew the stuck download (stalled). Hidden while
-// a healthy download is in progress.
-function RenewAction({ item, busy, onSearch, onRenew }) {
+// Search again (no sources) or renew the stuck download (stalled), plus an
+// interactive "Pick" that lists every candidate release for manual selection —
+// the way out when automatic searches keep failing. Hidden while a healthy
+// download is in progress.
+function RenewAction({ item, busy, onSearch, onRenew, onPick }) {
   if (!item.missing) return null;
   if (item.queue && item.queue.state !== 'stalled') return null;
   const stalled = item.queue?.state === 'stalled';
   return (
-    <button
-      onClick={stalled ? onRenew : onSearch}
-      disabled={busy}
-      className="btn-ghost mt-2 px-2.5 py-1.5 text-xs"
-      title={stalled ? 'Drop the stuck download, blocklist it and search again' : 'Search indexers now'}
-    >
-      {busy ? (
-        <Loader2 size={13} className="animate-spin" />
-      ) : stalled ? (
-        <RotateCcw size={13} />
-      ) : (
-        <Search size={13} />
-      )}
-      {stalled ? 'Renew' : 'Search'}
-    </button>
+    <div className="mt-2 flex gap-2">
+      <button
+        onClick={stalled ? onRenew : onSearch}
+        disabled={busy}
+        className="btn-ghost px-2.5 py-1.5 text-xs"
+        title={stalled ? 'Drop the stuck download, blocklist it and search again' : 'Search indexers now'}
+      >
+        {busy ? (
+          <Loader2 size={13} className="animate-spin" />
+        ) : stalled ? (
+          <RotateCcw size={13} />
+        ) : (
+          <Search size={13} />
+        )}
+        {stalled ? 'Renew' : 'Search'}
+      </button>
+      <button
+        onClick={onPick}
+        disabled={busy}
+        className="btn-ghost px-2.5 py-1.5 text-xs"
+        title="List every release the indexers have and pick one manually"
+      >
+        <ScanSearch size={13} />
+        Pick
+      </button>
+    </div>
   );
 }
 
@@ -91,7 +105,7 @@ function Poster({ src, fallback: Fallback }) {
   );
 }
 
-function MovieCard({ m, busy, onSearch, onRenew }) {
+function MovieCard({ m, busy, onSearch, onRenew, onPick }) {
   return (
     <div className="card flex gap-3 p-3">
       <Poster src={m.poster} fallback={Film} />
@@ -107,13 +121,13 @@ function MovieCard({ m, busy, onSearch, onRenew }) {
           </span>
           <span className="ml-2">{shortDate(m.date)}</span>
         </p>
-        <RenewAction item={m} busy={busy} onSearch={onSearch} onRenew={onRenew} />
+        <RenewAction item={m} busy={busy} onSearch={onSearch} onRenew={onRenew} onPick={onPick} />
       </div>
     </div>
   );
 }
 
-function EpisodeCard({ e, busy, onSearch, onRenew }) {
+function EpisodeCard({ e, busy, onSearch, onRenew, onPick }) {
   const code = `S${String(e.season).padStart(2, '0')}E${String(e.episode).padStart(2, '0')}`;
   return (
     <div className="card flex gap-3 p-3">
@@ -128,7 +142,7 @@ function EpisodeCard({ e, busy, onSearch, onRenew }) {
           {e.title ? ` · ${truncate(e.title, 40)}` : ''}
         </p>
         <p className="mt-2 text-xs text-silver">{shortDate(e.date)}</p>
-        <RenewAction item={e} busy={busy} onSearch={onSearch} onRenew={onRenew} />
+        <RenewAction item={e} busy={busy} onSearch={onSearch} onRenew={onRenew} onPick={onPick} />
       </div>
     </div>
   );
@@ -136,25 +150,35 @@ function EpisodeCard({ e, busy, onSearch, onRenew }) {
 
 // One chip per season with 2+ missing episodes: a single SeasonSearch command
 // covers season packs and is far lighter on indexers than per-episode searches.
-function SeasonChips({ groups, busyKey, onSearch }) {
+// The ScanSearch half opens the interactive picker for the season instead.
+function SeasonChips({ groups, busyKey, onSearch, onPick }) {
   if (!groups.length) return null;
   return (
     <div className="flex flex-wrap gap-2">
       {groups.map((g) => (
-        <button
-          key={g.key}
-          onClick={() => onSearch(g)}
-          disabled={busyKey === g.key}
-          className="btn-ghost px-2.5 py-1.5 text-xs"
-          title={`Search the whole season on the indexers (${g.count} missing episodes)`}
-        >
-          {busyKey === g.key ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <Search size={13} />
-          )}
-          {truncate(g.series, 24)} · S{String(g.season).padStart(2, '0')} ({g.count})
-        </button>
+        <div key={g.key} className="flex overflow-hidden rounded-lg">
+          <button
+            onClick={() => onSearch(g)}
+            disabled={busyKey === g.key}
+            className="btn-ghost rounded-none px-2.5 py-1.5 text-xs"
+            title={`Search the whole season on the indexers (${g.count} missing episodes)`}
+          >
+            {busyKey === g.key ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Search size={13} />
+            )}
+            {truncate(g.series, 24)} · S{String(g.season).padStart(2, '0')} ({g.count})
+          </button>
+          <button
+            onClick={() => onPick(g)}
+            disabled={busyKey === g.key}
+            className="btn-ghost rounded-none border-l border-night-700/60 px-2 py-1.5 text-xs"
+            title="List season releases and pick one manually"
+          >
+            <ScanSearch size={13} />
+          </button>
+        </div>
       ))}
     </div>
   );
@@ -183,6 +207,7 @@ export default function UpcomingTab() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState(null);
+  const [picker, setPicker] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -253,6 +278,30 @@ export default function UpcomingTab() {
       `Searching season ${g.season} of ${g.series}`
     );
 
+  const pickMovie = (m) =>
+    setPicker({ type: 'movie', service: 'radarr', id: m.id, label: `${m.title}${m.year ? ` (${m.year})` : ''}` });
+  const pickEpisode = (e) =>
+    setPicker({
+      type: 'episode',
+      service: 'sonarr',
+      id: e.id,
+      label: `${e.series} · S${String(e.season).padStart(2, '0')}E${String(e.episode).padStart(2, '0')}`
+    });
+  const pickSeason = (g) =>
+    setPicker({
+      type: 'season',
+      service: 'sonarr',
+      seriesId: g.seriesId,
+      seasonNumber: g.season,
+      label: `${g.series} · Season ${g.season}`
+    });
+
+  // Refresh after the picker closes — a grab puts the item in the queue.
+  const closePicker = () => {
+    setPicker(null);
+    load();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -305,6 +354,7 @@ export default function UpcomingTab() {
                   busy={busyKey === `movie:${m.id}`}
                   onSearch={() => searchMovie(m)}
                   onRenew={() => renewMovie(m)}
+                  onPick={() => pickMovie(m)}
                 />
               ))
             )}
@@ -321,7 +371,12 @@ export default function UpcomingTab() {
               </p>
             ) : (
               <>
-                <SeasonChips groups={seasonGroups} busyKey={busyKey} onSearch={searchSeason} />
+                <SeasonChips
+                  groups={seasonGroups}
+                  busyKey={busyKey}
+                  onSearch={searchSeason}
+                  onPick={pickSeason}
+                />
                 {episodes.map((e) => (
                   <EpisodeCard
                     key={e.id}
@@ -329,6 +384,7 @@ export default function UpcomingTab() {
                     busy={busyKey === `ep:${e.id}`}
                     onSearch={() => searchEpisode(e)}
                     onRenew={() => renewEpisode(e)}
+                    onPick={() => pickEpisode(e)}
                   />
                 ))}
               </>
@@ -336,6 +392,8 @@ export default function UpcomingTab() {
           </Section>
         </>
       )}
+
+      {picker && <ReleasePickerSheet target={picker} onClose={closePicker} />}
     </div>
   );
 }
