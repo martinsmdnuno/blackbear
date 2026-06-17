@@ -60,7 +60,7 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
-export default function AddSheet({ type, item, onClose }) {
+export default function AddSheet({ type, item, onClose, onAdded }) {
   const toast = useToast();
   const isMovie = type === 'movie';
 
@@ -117,6 +117,7 @@ export default function AddSheet({ type, item, onClose }) {
     try {
       await api.add({ type, item, options: opts });
       toast.success(`${item.title} added to ${isMovie ? 'Radarr' : 'Sonarr'}`);
+      onAdded?.(type, item);
       onClose();
     } catch (err) {
       toast.error(err.message);

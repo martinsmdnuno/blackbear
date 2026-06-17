@@ -40,6 +40,11 @@ const MODES = [
   { id: 'person', label: 'Person', icon: User }
 ];
 
+// Stable identity for a lookup result — matches the render key below.
+function resultKey(it) {
+  return it.tmdbId || it.tvdbId || it.titleSlug;
+}
+
 function ResultCard({ item, owned, onAdd }) {
   const poster = item.images?.find((i) => i.coverType === 'poster')?.remoteUrl;
   return (
@@ -236,6 +241,7 @@ export default function SearchTab() {
   const [lookingUp, setLookingUp] = useState(null);
   const [selected, setSelected] = useState(null);
   const [ownedIds, setOwnedIds] = useState({ movie: new Set(), series: new Set() });
+  const [added, setAdded] = useState(new Set());
   const debounce = useRef(null);
 
   useEffect(() => {
@@ -244,6 +250,16 @@ export default function SearchTab() {
       .then((d) => setOwnedIds({ movie: new Set(d.movie || []), series: new Set(d.series || []) }))
       .catch(() => {});
   }, []);
+
+  // Reflect a freshly-added title in the UI without a refresh: tag its row "In
+  // library" and update ownedIds so person-credit cards pick it up too.
+  function handleAdded(type, item) {
+    setAdded((s) => new Set(s).add(resultKey(item)));
+    if (item.tmdbId) {
+      const key = type === 'movie' ? 'movie' : 'series';
+      setOwnedIds((o) => ({ ...o, [key]: new Set(o[key]).add(item.tmdbId) }));
+    }
+  }
 
   function runSearch(q, m) {
     if (!q.trim()) {
@@ -366,9 +382,9 @@ export default function SearchTab() {
             ))
           : results.map((item) => (
               <ResultCard
-                key={item.tmdbId || item.tvdbId || item.titleSlug}
+                key={resultKey(item)}
                 item={item}
-                owned={item.id > 0}
+                owned={item.id > 0 || added.has(resultKey(item))}
                 onAdd={() => setSelected({ type: mode, item })}
               />
             ))}
@@ -393,7 +409,12 @@ export default function SearchTab() {
       )}
 
       {selected && (
-        <AddSheet type={selected.type} item={selected.item} onClose={() => setSelected(null)} />
+        <AddSheet
+          type={selected.type}
+          item={selected.item}
+          onAdded={handleAdded}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );

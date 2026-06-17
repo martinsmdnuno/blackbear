@@ -169,6 +169,13 @@ export default function TrendingTab() {
     }
   }
 
+  // Flag a just-added title "In library" right away, no refresh needed.
+  function handleAdded(type, item) {
+    if (!item.tmdbId) return;
+    const key = type === 'movie' ? 'movie' : 'series';
+    setOwnedIds((o) => ({ ...o, [key]: new Set(o[key]).add(item.tmdbId) }));
+  }
+
   async function hide(item) {
     setHidden((h) => new Set(h).add(item.tmdbId));
     try {
@@ -323,7 +330,14 @@ export default function TrendingTab() {
         </>
       )}
 
-      {selected && <AddSheet type={selected.type} item={selected.item} onClose={() => setSelected(null)} />}
+      {selected && (
+        <AddSheet
+          type={selected.type}
+          item={selected.item}
+          onAdded={handleAdded}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
