@@ -12,6 +12,7 @@ import trendingRoutes from './routes/trending.js';
 import libraryRoutes from './routes/library.js';
 import jellyfinRoutes from './routes/jellyfin.js';
 import settingsRoutes from './routes/settings.js';
+import portugasRoutes from './routes/portugas.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -34,6 +35,7 @@ app.use('/api/trending', trendingRoutes);
 app.use('/api/library', libraryRoutes);
 app.use('/api/jellyfin', jellyfinRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/portugas', portugasRoutes);
 app.use('/api/diagnostics', diagnosticsRoutes);
 
 app.use((err, _req, res, _next) => {

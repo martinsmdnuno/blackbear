@@ -38,6 +38,19 @@ export const movieReleases = (movieId) =>
 export const grabRelease = (guid, indexerId) =>
   client.post('/release', { guid, indexerId }, { timeout: RELEASE_TIMEOUT });
 
+// Tags + indexers — used by the Portugas guard to scope the Portugas indexer to
+// tagged media only (see services/portugas.js).
+export const tags = () => client.get('/tag');
+
+export const createTag = (label) => client.post('/tag', { label });
+
+export const indexers = () => client.get('/indexer');
+
+// forceSave skips the live "test the indexer" step Radarr otherwise runs on
+// save — a private tracker can be slow/flaky and we only changed its tags.
+export const updateIndexer = (indexer) =>
+  client.put(`/indexer/${indexer.id}?forceSave=true`, indexer, { timeout: 30000 });
+
 export const systemStatus = () => client.get('/system/status');
 
 export const health = () => client.get('/health');

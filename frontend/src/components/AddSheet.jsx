@@ -78,7 +78,8 @@ export default function AddSheet({ type, item, onClose }) {
     monitor: 'all',
     seasonFolder: true,
     seriesType: 'standard',
-    searchOnAdd: true
+    searchOnAdd: true,
+    usePortugas: false
   });
 
   useEffect(() => {
@@ -247,6 +248,18 @@ export default function AddSheet({ type, item, onClose }) {
               checked={opts.searchOnAdd}
               onChange={(v) => setOpts({ ...opts, searchOnAdd: v })}
             />
+
+            <div className="space-y-1">
+              <Toggle
+                label="Usar Portugas (desenhos animados)"
+                checked={opts.usePortugas}
+                onChange={(v) => setOpts({ ...opts, usePortugas: v })}
+              />
+              <p className="px-1 text-[11px] leading-snug text-silver">
+                Por defeito o Portugas é evitado (protecção Hit&nbsp;&amp;&nbsp;Run). Liga apenas
+                para conteúdo que queres mesmo ir buscar lá — tipicamente desenhos animados.
+              </p>
+            </div>
 
             <button onClick={submit} disabled={submitting} className="btn-gold w-full">
               {submitting ? (

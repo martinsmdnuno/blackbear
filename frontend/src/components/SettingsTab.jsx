@@ -13,6 +13,9 @@ import {
   AlertTriangle,
   ScrollText,
   RotateCw,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
   X
 } from 'lucide-react';
 import { api } from '../api/client.js';
@@ -189,6 +192,24 @@ function ServiceForm({ name, value, onChange }) {
   );
 }
 
+// Portugas (and most private trackers) require seeding each torrent to ratio 1
+// OR for a minimum of 168h (7 days) — whichever comes first — before it may be
+// removed. Deleting earlier counts as a Hit and Run: warnings, loss of download
+// privileges, and eventually a permanent ban (Portugas rules 4.2.1 / 4.3). These
+// floors are enforced here AND in the backend (services/cleanup.js) so the
+// cleanup can never trigger an HnR, however the config is set.
+const MIN_RATIO = 1;
+const MIN_SEED_HOURS = 168;
+
+const clampRatio = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= MIN_RATIO ? n : MIN_RATIO;
+};
+const clampSeedHours = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= MIN_SEED_HOURS ? Math.round(n) : MIN_SEED_HOURS;
+};
+
 function CleanupCard({ value, onChange }) {
   const c = value || {};
   return (
@@ -214,33 +235,45 @@ function CleanupCard({ value, onChange }) {
         and its files deleted to free space (safe with hardlinks: your library stays intact).
         Torrents Sonarr/Radarr are still importing are skipped.
       </p>
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
+        <p className="text-xs text-amber-200/90">
+          <span className="font-semibold">Hit &amp; Run protection.</span> Private trackers
+          (Portugas, rule 4.2.1) require every torrent to seed to <strong>ratio {MIN_RATIO}</strong>{' '}
+          or for at least <strong>{MIN_SEED_HOURS}h (7 days)</strong> before removal. Deleting
+          earlier earns an HnR strike → lost download rights and, after enough strikes, a permanent
+          ban. These fields are floored at those minimums and can't be set lower.
+        </p>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
-            Remove at ratio
+            Remove at ratio <span className="normal-case text-silver/60">(min {MIN_RATIO})</span>
           </span>
           <input
             type="number"
             step="0.1"
-            min="0"
+            min={MIN_RATIO}
             className="input"
-            value={c.ratio ?? 1}
+            value={c.ratio ?? MIN_RATIO}
             disabled={!c.enabled}
             onChange={(e) => onChange({ ...c, ratio: Number(e.target.value) })}
+            onBlur={(e) => onChange({ ...c, ratio: clampRatio(e.target.value) })}
           />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-silver">
-            …or after (hours)
+            …or after (hours) <span className="normal-case text-silver/60">(min {MIN_SEED_HOURS})</span>
           </span>
           <input
             type="number"
             step="1"
-            min="0"
+            min={MIN_SEED_HOURS}
             className="input"
-            value={c.seedHours ?? 12}
+            value={c.seedHours ?? MIN_SEED_HOURS}
             disabled={!c.enabled}
             onChange={(e) => onChange({ ...c, seedHours: Number(e.target.value) })}
+            onBlur={(e) => onChange({ ...c, seedHours: clampSeedHours(e.target.value) })}
           />
         </label>
       </div>
@@ -298,6 +331,117 @@ function CleanupCard({ value, onChange }) {
   );
 }
 
+// Portugas guard: shows whether the Portugas indexer is tag-scoped in Radarr and
+// Sonarr (so it's only used for titles the user opts into) and lets the user
+// (re-)apply that scoping. "Trust but verify" — Prowlarr's full sync can strip
+// the tag, so the status is read live rather than assumed.
+function ServiceGuardRow({ name, info }) {
+  const label = SERVICE_LABELS[name] || name;
+  let icon, text, tone;
+  if (info?.error) {
+    icon = <ShieldAlert size={15} className="text-blood-light" />;
+    text = info.error;
+    tone = 'text-blood-light';
+  } else if (info?.indexersFound === 0) {
+    icon = <ShieldAlert size={15} className="text-amber-400" />;
+    text = 'Indexer Portugas não encontrado';
+    tone = 'text-amber-200/90';
+  } else if (info?.protected) {
+    icon = <ShieldCheck size={15} className="text-emerald-400" />;
+    text = `Protegido (${info.indexers.map((i) => i.name).join(', ')})`;
+    tone = 'text-emerald-300';
+  } else {
+    icon = <ShieldAlert size={15} className="text-amber-400" />;
+    text = 'Encontrado mas SEM tag — desprotegido';
+    tone = 'text-amber-200/90';
+  }
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-16 shrink-0 font-semibold text-silver">{label}</span>
+      {icon}
+      <span className={tone}>{text}</span>
+    </div>
+  );
+}
+
+function PortugasCard() {
+  const toast = useToast();
+  const [status, setStatus] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = () =>
+    api
+      .portugasStatus()
+      .then((s) => {
+        setStatus(s);
+        setError(null);
+      })
+      .catch((err) => setError(err.message));
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function apply() {
+    setBusy(true);
+    try {
+      const s = await api.portugasSetup();
+      setStatus(s);
+      setError(null);
+      toast.success('Protecção Portugas aplicada');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card space-y-3 p-4">
+      <div className="flex items-center gap-2">
+        <Shield size={18} className="text-gold" />
+        <h3 className="font-bold text-parchment">Protecção Portugas</h3>
+      </div>
+      <p className="text-xs text-silver">
+        O indexer Portugas é marcado com uma tag, e o Radarr/Sonarr só o consultam para títulos
+        que tenham essa tag. Por defeito nada usa o Portugas — só quando ligas “Usar Portugas” ao
+        adicionar um título (ex. desenhos animados). Protege também os grabs automáticos e RSS, não
+        só os manuais.
+      </p>
+
+      {error ? (
+        <p className="text-xs text-blood-light">{error}</p>
+      ) : !status ? (
+        <div className="flex items-center gap-2 text-xs text-silver">
+          <Loader2 size={14} className="animate-spin" /> A verificar…
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {['radarr', 'sonarr'].map((name) => (
+            <ServiceGuardRow key={name} name={name} info={status[name]} />
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
+        <p className="text-xs text-amber-200/90">
+          Se o estado voltar a “sem tag” depois de aplicar, é o <strong>Prowlarr</strong> a
+          sobrepor-se no sync. Em Prowlarr → Settings → Apps, mete a ligação ao Radarr/Sonarr em{' '}
+          <strong>“Add and Remove Only”</strong> (ou marca o indexer com a tag no próprio Prowlarr)
+          para a tag persistir.
+        </p>
+      </div>
+
+      <button onClick={apply} disabled={busy} className="btn-ghost w-full">
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+        Aplicar / Re-aplicar protecção
+      </button>
+    </div>
+  );
+}
+
 function SettingsPanel() {
   const toast = useToast();
   const [form, setForm] = useState(null);
@@ -324,7 +468,14 @@ function SettingsPanel() {
         const { apiKeyConfigured, passwordConfigured, ...rest } = cfg;
         services[name] = rest;
       }
-      const updated = await api.saveSettings({ services, app: { cleanup: app.cleanup } });
+      // Floor the HnR-sensitive fields one more time before sending, in case the
+      // user edited and hit Save without the inputs losing focus.
+      const cleanup = {
+        ...app.cleanup,
+        ratio: clampRatio(app.cleanup?.ratio),
+        seedHours: clampSeedHours(app.cleanup?.seedHours)
+      };
+      const updated = await api.saveSettings({ services, app: { cleanup } });
       setForm(updated.services);
       setApp(updated.app || { cleanup: {} });
       toast.success('Settings saved');
@@ -363,6 +514,7 @@ function SettingsPanel() {
         />
       ))}
       <CleanupCard value={app.cleanup} onChange={(cleanup) => setApp({ ...app, cleanup })} />
+      <PortugasCard />
       <button onClick={save} disabled={saving} className="btn-gold w-full">
         {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
         Save settings

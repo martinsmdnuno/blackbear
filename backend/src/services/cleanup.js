@@ -6,6 +6,13 @@ import * as radarr from './radarr.js';
 let timer = null;
 let lastRun = null;
 
+// Hit-and-Run floors (Portugas rule 4.2.1): a torrent must reach ratio 1 OR seed
+// for at least 168h (7 days) before it may be removed. We clamp the configured
+// values to these minimums so a misconfig (UI bypass, hand-edited config.json)
+// can never make the cleanup delete a torrent early and earn an HnR strike.
+const MIN_RATIO = 1.0;
+const MIN_SEED_HOURS = 168;
+
 function isComplete(t) {
   return t.progress >= 1 || (t.completed > 0 && t.completed >= t.size);
 }
@@ -31,9 +38,15 @@ export async function runCleanup() {
   const cfg = getAppConfig().cleanup || {};
   if (!cfg.enabled) return { skipped: 'disabled' };
 
-  const minRatio = typeof cfg.ratio === 'number' ? cfg.ratio : 1.0;
-  const maxSeedSeconds = (typeof cfg.seedHours === 'number' ? cfg.seedHours : 12) * 3600;
+  // Clamp to the HnR floors — never trust the stored value to be safe.
+  const minRatio = Math.max(MIN_RATIO, typeof cfg.ratio === 'number' ? cfg.ratio : MIN_RATIO);
+  const seedHours = Math.max(MIN_SEED_HOURS, typeof cfg.seedHours === 'number' ? cfg.seedHours : MIN_SEED_HOURS);
+  const maxSeedSeconds = seedHours * 3600;
   const deleteFiles = cfg.deleteFiles !== false;
+  if ((typeof cfg.ratio === 'number' && cfg.ratio < MIN_RATIO) ||
+      (typeof cfg.seedHours === 'number' && cfg.seedHours < MIN_SEED_HOURS)) {
+    console.warn(`[cleanup] config below HnR floor (ratio=${cfg.ratio}, seedHours=${cfg.seedHours}) — clamped to ratio>=${MIN_RATIO}, seedHours>=${MIN_SEED_HOURS}`);
+  }
   const nowSec = Date.now() / 1000;
 
   let torrents;

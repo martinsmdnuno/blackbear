@@ -70,6 +70,9 @@ export const api = {
   testConnection: (service) =>
     req('/settings/test', { method: 'POST', body: JSON.stringify({ service }) }),
 
+  portugasStatus: () => req('/portugas/status'),
+  portugasSetup: () => req('/portugas/setup', { method: 'POST' }),
+
   library: () => req('/library'),
   libraryIds: () => req('/library/ids'),
   jellyfin: () => req('/jellyfin'),

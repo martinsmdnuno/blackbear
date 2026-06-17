@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as sonarr from '../services/sonarr.js';
 import * as radarr from '../services/radarr.js';
+import { tagIdFor } from '../services/portugas.js';
 
 const router = Router();
 
@@ -51,13 +52,20 @@ router.post('/', async (req, res) => {
   try {
     const rootFolderPath = options.rootFolderPath || (await defaultRootFolder(svc));
 
+    // Opting in routes this title to Portugas: tag it so the (tag-scoped)
+    // Portugas indexer becomes eligible for it. Untagged titles never touch
+    // Portugas — that's the default-off Hit & Run protection. See
+    // services/portugas.js.
+    const tags = options.usePortugas === true ? [await tagIdFor(type === 'movie' ? 'radarr' : 'sonarr')] : [];
+
     if (type === 'movie') {
       const payload = {
         ...item,
         qualityProfileId: options.qualityProfileId,
         rootFolderPath,
         monitored: options.monitored !== false,
-        minimumAvailability: options.minimumAvailability || 'released',
+        minimumAvailability: options.minimumAvailability || 'inCinemas',
+        tags,
         addOptions: { searchForMovie: options.searchOnAdd === true }
       };
       delete payload.id;
@@ -72,6 +80,7 @@ router.post('/', async (req, res) => {
       monitored: options.monitor !== 'none',
       seasonFolder: options.seasonFolder !== false,
       seriesType: options.seriesType || 'standard',
+      tags,
       addOptions: {
         monitor: options.monitor || 'all',
         searchForMissingEpisodes: options.searchOnAdd === true,
