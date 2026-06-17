@@ -17,7 +17,7 @@
 set -euo pipefail
 
 HOST="${BLACKBEAR_HOST:-nunomartins@192.168.1.134}"
-DIR="${BLACKBEAR_DIR:-~/Desktop/blackbear/blackbeard}"
+DIR="${BLACKBEAR_DIR:-~/blackbear/blackbeard}"
 
 TARGET="${HOST#*@}"
 
