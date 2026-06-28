@@ -67,6 +67,13 @@ export const health = () => client.get('/health');
 export const calendar = (start, end) =>
   client.get(`/calendar?start=${start}&end=${end}&unmonitored=false&includeSeries=true`);
 
+// Recent activity for the "Novidades" feed — grabbed (eventType 1) and imported
+// (eventType 3) events, newest first, with episode + series embedded.
+export const history = (pageSize = 100) =>
+  client.get(
+    `/history?page=1&pageSize=${pageSize}&sortKey=date&sortDirection=descending&eventType=1&eventType=3&includeEpisode=true&includeSeries=true`
+  );
+
 // Aired but not downloaded yet (paginated, large pageSize so we get most).
 export const missing = (pageSize = 200) =>
   client.get(

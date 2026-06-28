@@ -64,11 +64,6 @@ function defaultConfig() {
   };
 }
 
-// Where the mutable "seen" list (hidden Trending items) lives — next to
-// config.json, in the same persisted volume, but separate so the secrets file
-// isn't rewritten on every dismiss.
-const SEEN_PATH = resolve(dirname(CONFIG_PATH), 'seen.json');
-
 let cache = null;
 
 function deepMerge(base, override) {
@@ -138,4 +133,4 @@ export function saveConfig(update) {
   return cache;
 }
 
-export { CONFIG_PATH, SEEN_PATH };
+export { CONFIG_PATH };

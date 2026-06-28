@@ -60,4 +60,11 @@ export const diskSpace = () => client.get('/diskspace');
 export const calendar = (start, end) =>
   client.get(`/calendar?start=${start}&end=${end}&unmonitored=false`);
 
+// Recent activity for the "Novidades" feed — grabbed (eventType 1) and imported
+// (eventType 3) events, newest first.
+export const history = (pageSize = 100) =>
+  client.get(
+    `/history?page=1&pageSize=${pageSize}&sortKey=date&sortDirection=descending&eventType=1&eventType=3`
+  );
+
 export default client;

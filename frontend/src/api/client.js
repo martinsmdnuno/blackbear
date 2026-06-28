@@ -27,14 +27,7 @@ export const api = {
   pipeline: () => req('/pipeline'),
   trending: (mode = 'trending') => req(`/trending?mode=${mode}`),
   recommended: () => req('/trending/recommended'),
-  seenList: () => req('/trending/seen'),
-  markSeen: (type, item) =>
-    req('/trending/seen', {
-      method: 'POST',
-      body: JSON.stringify({ type, tmdbId: item.tmdbId, title: item.title, poster: item.poster, year: item.year })
-    }),
-  unhide: (type, tmdbId) =>
-    req('/trending/seen', { method: 'DELETE', body: JSON.stringify({ type, tmdbId }) }),
+  novidades: (days = 30) => req(`/novidades?days=${days}`),
 
   renewEpisode: (id) => req(`/renew/episode/${id}`, { method: 'POST' }),
   renewSeason: (seriesId, seasonNumber) =>

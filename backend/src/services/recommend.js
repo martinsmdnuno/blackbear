@@ -1,7 +1,6 @@
 import * as tmdb from './tmdb.js';
 import * as radarr from './radarr.js';
 import * as sonarr from './sonarr.js';
-import { seenSet } from './seen.js';
 
 // Sample sizes: how many recent library titles to seed recommendations from.
 const MOVIE_SEEDS = 15;
@@ -19,13 +18,13 @@ function recent(items, dateKey, n) {
 }
 
 // Aggregate recommendation lists: rank by how often a title is recommended
-// across the seeds, then by rating. Drop anything already owned or seen.
-function aggregate(lists, ownedIds, seen) {
+// across the seeds, then by rating. Drop anything already owned.
+function aggregate(lists, ownedIds) {
   const byId = new Map();
   for (const list of lists) {
     for (const item of list || []) {
       if (!item?.tmdbId) continue;
-      if (ownedIds.has(item.tmdbId) || seen.has(item.tmdbId)) continue;
+      if (ownedIds.has(item.tmdbId)) continue;
       const cur = byId.get(item.tmdbId);
       if (cur) cur.score += 1;
       else byId.set(item.tmdbId, { ...item, score: 1 });
@@ -60,8 +59,8 @@ export async function recommend({ refresh = false } = {}) {
   ]);
 
   const data = {
-    movies: aggregate(movieLists, ownedMovieIds, seenSet('movie')),
-    series: aggregate(seriesLists, ownedSeriesIds, seenSet('series')),
+    movies: aggregate(movieLists, ownedMovieIds),
+    series: aggregate(seriesLists, ownedSeriesIds),
     basedOn: { movies: movieSeeds.length, series: seriesSeeds.length }
   };
 
