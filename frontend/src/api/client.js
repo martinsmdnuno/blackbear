@@ -55,8 +55,8 @@ export const api = {
 
   portugasStatus: () => req('/portugas/status'),
   portugasSetup: () => req('/portugas/setup', { method: 'POST' }),
-  grabLink: (url, type, title) =>
-    req('/portugas/grab', { method: 'POST', body: JSON.stringify({ url, type, title }) }),
+  grabLink: (url, type, item, title) =>
+    req('/portugas/grab', { method: 'POST', body: JSON.stringify({ url, type, item, title }) }),
 
   libraryIds: () => req('/library/ids'),
 

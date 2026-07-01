@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as portugas from '../services/portugas.js';
+import { tagIdFor } from '../services/portugas.js';
 import * as radarr from '../services/radarr.js';
 import * as sonarr from '../services/sonarr.js';
 
@@ -7,7 +8,7 @@ const router = Router();
 
 const LINK_RE = /^(magnet:|https?:\/\/)/i;
 
-// Radarr/Sonarr reject a rejected release with a list of reasons; flatten them
+// Radarr/Sonarr report a refused release with a list of reasons; flatten them
 // (they arrive as strings or { reason } objects depending on version) so we can
 // tell the user *why* the push didn't grab.
 function rejectionReasons(rel) {
@@ -16,15 +17,54 @@ function rejectionReasons(rel) {
     .filter(Boolean);
 }
 
-// POST /api/portugas/grab  body: { url, type, title }
-// Push a specific torrent link (magnet or .torrent URL, typically from Portugas)
-// through Radarr (movie) or Sonarr (series) so the *arr grabs it, sends it to the
-// download client, and tracks it in the queue for import — i.e. it ends up synced
-// in Radarr/Sonarr, not orphaned in qBittorrent. `title` is the release name the
-// *arr parses to identify the library title, so it must match something you own.
+// Add a looked-up movie/series to the library so a pushed release has something
+// to attach to. Search is left OFF — we don't want the *arr auto-grabbing some
+// other release before/alongside the specific torrent the user chose. Tagged for
+// Portugas so the (tag-scoped) Portugas indexer stays eligible for it too.
+async function ensureInLibrary(svc, serviceName, type, item) {
+  // A lookup item already in the library carries its real (non-zero) id.
+  if (item.id) return item;
+
+  const [profiles, folders] = await Promise.all([svc.qualityProfiles(), svc.rootFolders()]);
+  if (!profiles?.length) throw new Error(`No quality profile configured in ${serviceName}`);
+  if (!folders?.length) throw new Error(`No root folder configured in ${serviceName}`);
+
+  const tags = [await tagIdFor(serviceName)];
+  const base = {
+    ...item,
+    qualityProfileId: profiles[0].id,
+    rootFolderPath: folders[0].path,
+    monitored: true,
+    tags
+  };
+  delete base.id;
+
+  if (type === 'movie') {
+    return radarr.addMovie({
+      ...base,
+      minimumAvailability: 'released',
+      addOptions: { searchForMovie: false }
+    });
+  }
+  return sonarr.addSeries({
+    ...base,
+    seasonFolder: true,
+    seriesType: 'standard',
+    addOptions: { monitor: 'all', searchForMissingEpisodes: false, searchForCutoffUnmetEpisodes: false }
+  });
+}
+
+// POST /api/portugas/grab  body: { url, type, item, title }
+// Grab a specific torrent link (a direct .torrent URL or magnet, typically from
+// Portugas) and get it synced in Radarr/Sonarr rather than orphaned in the
+// download client. Flow: make sure `item` (a Radarr/Sonarr lookup result) is in
+// the library — adding it if needed — then push the release so the *arr grabs it,
+// sends it to the download client, and imports it. `title` is the release name
+// the *arr parses to match the library title (and read quality from).
 router.post('/grab', async (req, res) => {
   const url = (req.body?.url || '').trim();
   const type = req.body?.type;
+  const item = req.body?.item;
   const title = (req.body?.title || '').trim();
 
   if (!url) return res.status(400).json({ error: 'A torrent link is required' });
@@ -34,11 +74,11 @@ router.post('/grab', async (req, res) => {
   if (type !== 'movie' && type !== 'series') {
     return res.status(400).json({ error: 'type must be "movie" or "series"' });
   }
-  if (!title) {
-    return res.status(400).json({ error: 'A release title is required so Radarr/Sonarr can match it' });
-  }
+  if (!item?.tmdbId) return res.status(400).json({ error: 'Pick a title to attach the torrent to' });
+  if (!title) return res.status(400).json({ error: 'A release title is required' });
 
   const svc = type === 'movie' ? radarr : sonarr;
+  const serviceName = type === 'movie' ? 'radarr' : 'sonarr';
   const label = type === 'movie' ? 'Radarr' : 'Sonarr';
   const isMagnet = /^magnet:/i.test(url);
   const release = {
@@ -50,6 +90,7 @@ router.post('/grab', async (req, res) => {
   };
 
   try {
+    const added = await ensureInLibrary(svc, serviceName, type, item);
     const result = await svc.pushRelease(release);
     const rel = Array.isArray(result) ? result[0] : result;
     if (rel && (rel.rejected || rejectionReasons(rel).length)) {
@@ -57,10 +98,10 @@ router.post('/grab', async (req, res) => {
       return res.status(422).json({
         error: reasons.length
           ? `${label} recusou: ${reasons.join('; ')}`
-          : `${label} não conseguiu associar "${title}" a nada na biblioteca`
+          : `${label} não conseguiu associar "${title}" ao título`
       });
     }
-    res.json({ ok: true, service: type });
+    res.json({ ok: true, service: type, added: !item.id, title: added?.title || item.title });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
