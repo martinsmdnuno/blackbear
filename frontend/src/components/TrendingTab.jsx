@@ -1,28 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Flame,
-  Clock,
-  Sparkles,
-  Sparkle,
-  Film,
-  Tv,
-  Plus,
-  Loader2,
-  Star,
-  Check,
-  DownloadCloud,
-  CheckCircle2
-} from 'lucide-react';
+import { Flame, Clock, Sparkles, Film, Tv, Plus, Loader2, Star, Check } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
-import { agoLabel } from '../lib/format.js';
 
 const MODES = [
   { id: 'trending', label: 'Trending', icon: Flame },
   { id: 'recent', label: 'Recent', icon: Clock },
-  { id: 'recommended', label: 'For You', icon: Sparkles },
-  { id: 'novidades', label: 'Novidades', icon: Sparkle }
+  { id: 'recommended', label: 'For You', icon: Sparkles }
 ];
 
 // A discovery poster (Trending / Recent / For You) — tap to add via AddSheet.
@@ -79,46 +64,6 @@ function PosterCard({ item, busy, owned, onPick }) {
   );
 }
 
-// A "Novidades" poster — what just landed, with its grab/import state.
-function NovidadeCard({ item }) {
-  const Icon = item.type === 'movie' ? Film : Tv;
-  const imported = item.state === 'imported';
-  const isEp = item.type === 'episode';
-  const code =
-    isEp && item.season != null && item.episode != null
-      ? `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`
-      : null;
-  return (
-    <div className="relative block overflow-hidden rounded-lg bg-night-800 ring-1 ring-transparent">
-      <div className="aspect-[2/3] w-full overflow-hidden bg-night-800">
-        {item.poster ? (
-          <img src={item.poster} alt="" loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-silver/60">
-            <Icon size={26} />
-          </div>
-        )}
-        <span
-          className={`absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold backdrop-blur
-            ${imported ? 'bg-emerald-500/85 text-night-950' : 'bg-sky-500/85 text-night-950'}`}
-        >
-          {imported ? <CheckCircle2 size={11} /> : <DownloadCloud size={11} />}
-          {imported ? 'Imported' : 'Downloading'}
-        </span>
-      </div>
-      <div className="p-1.5">
-        <h3 className="truncate text-xs font-semibold leading-tight text-parchment">
-          {isEp ? item.series : item.title}
-        </h3>
-        <div className="flex items-center gap-1.5 text-[10px] text-silver">
-          {code && <span className="font-semibold text-parchment/80">{code}</span>}
-          <span>{agoLabel(item.date)}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Section({ title, count, icon: Icon, children }) {
   return (
     <section className="space-y-2.5">
@@ -159,8 +104,7 @@ export default function TrendingTab() {
     setLoading(true);
     setData(null);
     try {
-      if (m === 'novidades') setData(await api.novidades());
-      else if (m === 'recommended') setData(await api.recommended());
+      if (m === 'recommended') setData(await api.recommended());
       else setData(await api.trending(m));
       setError(null);
     } catch (err) {
@@ -203,18 +147,20 @@ export default function TrendingTab() {
     setOwnedIds((o) => ({ ...o, [key]: new Set(o[key]).add(item.tmdbId) }));
   }
 
-  const isNovidades = mode === 'novidades';
   const isRecommended = mode === 'recommended';
-  const movies = data?.movies || [];
-  const series = data?.series || [];
-  const novidades = data?.items || [];
+  // On the Trending tab, hide anything already in the library — you only want to
+  // see what you don't own yet. Other modes keep showing owned (with a badge).
+  const hideOwned = mode === 'trending';
+  const filterOwned = (list, key) =>
+    hideOwned ? list.filter((it) => !ownedIds[key].has(it.tmdbId)) : list;
+  const movies = filterOwned(data?.movies || [], 'movie');
+  const series = filterOwned(data?.series || [], 'series');
   const emptyRecommended = isRecommended && data && !movies.length && !series.length;
-  const emptyNovidades = isNovidades && data && !novidades.length;
 
   return (
     <div className="space-y-5">
-      {/* Trending / Recent / For You / Novidades */}
-      <div className="grid grid-cols-4 gap-1 rounded-lg bg-night-850 p-1">
+      {/* Trending / Recent / For You */}
+      <div className="grid grid-cols-3 gap-1 rounded-lg bg-night-850 p-1">
         {MODES.map((t) => {
           const Icon = t.icon;
           const active = mode === t.id;
@@ -235,11 +181,9 @@ export default function TrendingTab() {
       {error && (
         <p className="rounded-md border border-blood/40 bg-blood/10 px-3 py-2.5 text-sm text-blood-light">
           {error}
-          {!isNovidades && (
-            <span className="mt-1 block text-xs text-silver">
-              Set a TMDb API key in Settings to enable this.
-            </span>
-          )}
+          <span className="mt-1 block text-xs text-silver">
+            Set a TMDb API key in Settings to enable this.
+          </span>
         </p>
       )}
 
@@ -264,23 +208,8 @@ export default function TrendingTab() {
         </p>
       )}
 
-      {emptyNovidades && (
-        <p className="card p-6 text-center text-sm text-silver">
-          Nothing new lately. Titles you grab or import show up here as they land.
-        </p>
-      )}
-
-      {/* Novidades: a single feed, newest first. */}
-      {isNovidades && data && !emptyNovidades && (
-        <div className={GRID}>
-          {novidades.map((n) => (
-            <NovidadeCard key={`${n.type}${n.id}`} item={n} />
-          ))}
-        </div>
-      )}
-
       {/* Discovery modes: Movies then Series, each a poster grid. */}
-      {!isNovidades && data && !emptyRecommended && (
+      {data && !emptyRecommended && (
         <>
           {isRecommended && data.basedOn && (
             <p className="px-1 text-xs text-silver">

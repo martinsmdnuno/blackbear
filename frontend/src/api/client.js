@@ -27,7 +27,6 @@ export const api = {
   pipeline: () => req('/pipeline'),
   trending: (mode = 'trending') => req(`/trending?mode=${mode}`),
   recommended: () => req('/trending/recommended'),
-  novidades: (days = 30) => req(`/novidades?days=${days}`),
 
   renewEpisode: (id) => req(`/renew/episode/${id}`, { method: 'POST' }),
   renewSeason: (seriesId, seasonNumber) =>
@@ -49,15 +48,6 @@ export const api = {
       body: JSON.stringify({ service, guid: release.guid, indexerId: release.indexerId })
     }),
 
-  downloads: () => req('/downloads'),
-  bazarrSearchWanted: () => req('/downloads/bazarr/search-wanted', { method: 'POST' }),
-  torrentPause: (hash) => req(`/downloads/torrents/${hash}/pause`, { method: 'POST' }),
-  torrentResume: (hash) => req(`/downloads/torrents/${hash}/resume`, { method: 'POST' }),
-  torrentDelete: (hash, deleteFiles) =>
-    req(`/downloads/torrents/${hash}?deleteFiles=${deleteFiles ? 'true' : 'false'}`, {
-      method: 'DELETE'
-    }),
-
   settings: () => req('/settings'),
   saveSettings: (payload) => req('/settings', { method: 'POST', body: JSON.stringify(payload) }),
   testConnection: (service) =>
@@ -65,14 +55,10 @@ export const api = {
 
   portugasStatus: () => req('/portugas/status'),
   portugasSetup: () => req('/portugas/setup', { method: 'POST' }),
+  grabLink: (url, type, title) =>
+    req('/portugas/grab', { method: 'POST', body: JSON.stringify({ url, type, title }) }),
 
-  library: () => req('/library'),
   libraryIds: () => req('/library/ids'),
-  jellyfin: () => req('/jellyfin'),
-  deleteMovie: (id, deleteFiles) =>
-    req(`/library/movie/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`, { method: 'DELETE' }),
-  deleteSeries: (id, deleteFiles) =>
-    req(`/library/series/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`, { method: 'DELETE' }),
 
   diagnostics: () => req('/diagnostics'),
   logs: (service, tail = 200) => req(`/diagnostics/logs/${service}?tail=${tail}`),
