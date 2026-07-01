@@ -3,6 +3,7 @@ import { Search, Film, Tv, User, Plus, Loader2, X, Star, Check } from 'lucide-re
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
+import LinkGrab from './LinkGrab.jsx';
 import { truncate } from '../lib/format.js';
 
 // Radarr/Sonarr lookups embed ratings. Prefer IMDb, then TMDb, then the simple
@@ -309,6 +310,8 @@ export default function SearchTab() {
 
   return (
     <div className="space-y-4">
+      <LinkGrab />
+
       {/* Movie / Series / Person toggle */}
       <div className="grid grid-cols-3 gap-1 rounded-lg bg-night-850 p-1">
         {MODES.map((t) => {

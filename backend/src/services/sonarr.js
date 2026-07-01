@@ -47,6 +47,14 @@ export const seasonReleases = (seriesId, seasonNumber) =>
 export const grabRelease = (guid, indexerId) =>
   client.post('/release', { guid, indexerId }, { timeout: RELEASE_TIMEOUT });
 
+// Push an externally-sourced release (e.g. a hand-picked Portugas torrent link)
+// through Sonarr's own decision pipeline: Sonarr parses `title`, maps it to a
+// series/episode in the library, and — if approved — sends it to the download
+// client and tracks it in the queue for import. This is how a manual link ends
+// up synced in Sonarr rather than orphaned in qBittorrent.
+export const pushRelease = (release) =>
+  client.post('/release/push', release, { timeout: RELEASE_TIMEOUT });
+
 // Tags + indexers — used by the Portugas guard to scope the Portugas indexer to
 // tagged media only (see services/portugas.js).
 export const tags = () => client.get('/tag');
