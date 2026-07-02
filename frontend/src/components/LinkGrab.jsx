@@ -25,10 +25,43 @@ export default function LinkGrab() {
   const [selected, setSelected] = useState(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resolvedName, setResolvedName] = useState('');
+  const [resolving, setResolving] = useState(false);
   const debounce = useRef(null);
+  const nameDebounce = useRef(null);
+  // The user has hand-edited the title field — stop auto-filling it from the link.
+  const titleTouched = useRef(false);
 
   const link = url.trim();
   const valid = LINK_RE.test(link) && selected && title.trim().length > 0;
+
+  // Resolve the real release name behind the pasted link (the .torrent's
+  // info.name / a magnet's dn). It carries the quality tokens the *arr needs to
+  // parse — seeding the title field with "Enola Holmes 3 2026" instead makes
+  // Radarr parse Unknown quality and refuse the push.
+  useEffect(() => {
+    clearTimeout(nameDebounce.current);
+    if (!LINK_RE.test(link)) {
+      setResolvedName('');
+      setResolving(false);
+      return;
+    }
+    setResolving(true);
+    nameDebounce.current = setTimeout(() => {
+      api
+        .resolveName(link)
+        .then((r) => setResolvedName(r?.name || ''))
+        .catch(() => setResolvedName(''))
+        .finally(() => setResolving(false));
+    }, 500);
+    return () => clearTimeout(nameDebounce.current);
+  }, [link]);
+
+  // Once we know the real name and a title is picked, fill the field with it —
+  // unless the user has already typed their own.
+  useEffect(() => {
+    if (selected && resolvedName && !titleTouched.current) setTitle(resolvedName);
+  }, [resolvedName, selected]);
 
   // Search Radarr/Sonarr as the user types, so they can pick the exact title
   // (and resolve same-name/same-year ambiguity) before grabbing.
@@ -56,14 +89,18 @@ export default function LinkGrab() {
     setResults([]);
     setTerm('');
     setTitle('');
+    titleTouched.current = false;
   }
 
   function pick(item) {
     setSelected(item);
     setResults([]);
     setTerm('');
-    // Seed a parseable release name; the user can paste the exact Portugas name.
-    setTitle(`${item.title}${item.year ? ` ${item.year}` : ''}`);
+    titleTouched.current = false;
+    // Prefer the real release name from the link (has quality tokens the *arr can
+    // parse); fall back to title+year until it resolves. The name effect fills it
+    // in later if the link resolves after the pick.
+    setTitle(resolvedName || `${item.title}${item.year ? ` ${item.year}` : ''}`);
   }
 
   async function grab() {
@@ -79,6 +116,8 @@ export default function LinkGrab() {
       setUrl('');
       setSelected(null);
       setTitle('');
+      setResolvedName('');
+      titleTouched.current = false;
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -147,6 +186,7 @@ export default function LinkGrab() {
             onClick={() => {
               setSelected(null);
               setTitle('');
+              titleTouched.current = false;
             }}
             className="rounded-lg p-1 text-silver hover:text-parchment"
           >
@@ -198,18 +238,38 @@ export default function LinkGrab() {
       )}
 
       {selected && (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && grab()}
-            placeholder="Nome do release (ex.: Obsession.2026.1080p.WEB-DL…)"
-            className="input flex-1"
-          />
-          <button onClick={grab} disabled={!valid || busy} className="btn-gold sm:w-auto">
-            {busy ? <Loader2 size={18} className="animate-spin" /> : <DownloadCloud size={18} />}
-            Descarregar
-          </button>
+        <div className="space-y-1">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <input
+                value={title}
+                onChange={(e) => {
+                  titleTouched.current = true;
+                  setTitle(e.target.value);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && grab()}
+                placeholder="Nome do release (ex.: Obsession.2026.1080p.WEB-DL…)"
+                className="input w-full"
+              />
+              {resolving && (
+                <Loader2
+                  size={16}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gold"
+                />
+              )}
+            </div>
+            <button onClick={grab} disabled={!valid || busy} className="btn-gold sm:w-auto">
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <DownloadCloud size={18} />}
+              Descarregar
+            </button>
+          </div>
+          <p className="text-xs leading-snug text-silver">
+            {resolving
+              ? 'A obter o nome do release do link…'
+              : resolvedName
+                ? 'Nome obtido do .torrent — o Radarr/Sonarr lê a qualidade daqui.'
+                : 'Sem nome automático — cola o nome completo do release (com 1080p/WEB-DL…) para o *arr aceitar.'}
+          </p>
         </div>
       )}
     </div>

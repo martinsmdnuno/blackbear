@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as portugas from '../services/portugas.js';
 import { tagIdFor } from '../services/portugas.js';
+import { resolveReleaseName } from '../services/torrent.js';
 import * as radarr from '../services/radarr.js';
 import * as sonarr from '../services/sonarr.js';
 
@@ -15,6 +16,28 @@ function rejectionReasons(rel) {
   return (rel?.rejections || [])
     .map((r) => (typeof r === 'string' ? r : r.reason))
     .filter(Boolean);
+}
+
+// The *arr parses quality out of the release title. A title with none of these
+// tokens parses as Unknown and gets refused by the profile — the signal we use
+// to decide whether to fall back to the torrent's real name server-side.
+const QUALITY_TOKEN =
+  /\b(480p|576p|720p|1080p|1440p|2160p|4k|web[- ]?dl|web[- ]?rip|webrip|web|bluray|blu[- ]?ray|bdrip|brrip|hdtv|dvdrip|remux|hdr|dv|x264|x265|h\.?264|h\.?265|hevc|avc)\b/i;
+
+// The frontend normally fills in the real release name already, but a bare title
+// (direct API call, or a link the browser couldn't resolve) would still be
+// refused as Unknown. If the given title carries no quality token, try to recover
+// the torrent's real name from the link and push that instead. Best-effort: on
+// any failure we keep the original title and let the normal rejection surface.
+async function titleForPush(title, url) {
+  if (QUALITY_TOKEN.test(title)) return title;
+  try {
+    const resolved = await resolveReleaseName(url);
+    if (resolved && QUALITY_TOKEN.test(resolved)) return resolved;
+  } catch {
+    // unreachable / not a .torrent — fall through to the original title
+  }
+  return title;
 }
 
 // Add a looked-up movie/series to the library so a pushed release has something
@@ -54,6 +77,25 @@ async function ensureInLibrary(svc, serviceName, type, item) {
   });
 }
 
+// POST /api/portugas/name  body: { url }
+// Resolve the real release name behind a torrent link (the .torrent's info.name
+// or a magnet's dn) so the UI can seed the release-title field with something the
+// *arr can parse a quality out of — a bare "Enola Holmes 3 2026" parses as
+// Unknown quality and gets refused by the profile.
+router.post('/name', async (req, res) => {
+  const url = (req.body?.url || '').trim();
+  if (!url) return res.status(400).json({ error: 'A torrent link is required' });
+  if (!LINK_RE.test(url)) {
+    return res.status(400).json({ error: 'Link must be a magnet: or http(s):// .torrent URL' });
+  }
+  try {
+    const name = await resolveReleaseName(url);
+    res.json({ name });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // POST /api/portugas/grab  body: { url, type, item, title }
 // Grab a specific torrent link (a direct .torrent URL or magnet, typically from
 // Portugas) and get it synced in Radarr/Sonarr rather than orphaned in the
@@ -81,8 +123,11 @@ router.post('/grab', async (req, res) => {
   const serviceName = type === 'movie' ? 'radarr' : 'sonarr';
   const label = type === 'movie' ? 'Radarr' : 'Sonarr';
   const isMagnet = /^magnet:/i.test(url);
+  // Safety net for a quality-less title (Unknown → refused): recover the real
+  // release name from the link when we can.
+  const pushTitle = await titleForPush(title, url);
   const release = {
-    title,
+    title: pushTitle,
     protocol: 'torrent',
     publishDate: new Date().toISOString(),
     guid: url,
@@ -98,7 +143,7 @@ router.post('/grab', async (req, res) => {
       return res.status(422).json({
         error: reasons.length
           ? `${label} recusou: ${reasons.join('; ')}`
-          : `${label} não conseguiu associar "${title}" ao título`
+          : `${label} não conseguiu associar "${pushTitle}" ao título`
       });
     }
     res.json({ ok: true, service: type, added: !item.id, title: added?.title || item.title });
