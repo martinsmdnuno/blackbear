@@ -1,13 +1,10 @@
 import { Router } from 'express';
 import * as portugas from '../services/portugas.js';
 import { tagIdFor } from '../services/portugas.js';
-import { resolveReleaseName } from '../services/torrent.js';
 import * as radarr from '../services/radarr.js';
 import * as sonarr from '../services/sonarr.js';
 
 const router = Router();
-
-const LINK_RE = /^(magnet:|https?:\/\/)/i;
 
 // Radarr/Sonarr report a refused release with a list of reasons; flatten them
 // (they arrive as strings or { reason } objects depending on version) so we can
@@ -18,26 +15,16 @@ function rejectionReasons(rel) {
     .filter(Boolean);
 }
 
-// The *arr parses quality out of the release title. A title with none of these
-// tokens parses as Unknown and gets refused by the profile — the signal we use
-// to decide whether to fall back to the torrent's real name server-side.
-const QUALITY_TOKEN =
-  /\b(480p|576p|720p|1080p|1440p|2160p|4k|web[- ]?dl|web[- ]?rip|webrip|web|bluray|blu[- ]?ray|bdrip|brrip|hdtv|dvdrip|remux|hdr|dv|x264|x265|h\.?264|h\.?265|hevc|avc)\b/i;
-
-// The frontend normally fills in the real release name already, but a bare title
-// (direct API call, or a link the browser couldn't resolve) would still be
-// refused as Unknown. If the given title carries no quality token, try to recover
-// the torrent's real name from the link and push that instead. Best-effort: on
-// any failure we keep the original title and let the normal rejection surface.
-async function titleForPush(title, url) {
-  if (QUALITY_TOKEN.test(title)) return title;
-  try {
-    const resolved = await resolveReleaseName(url);
-    if (resolved && QUALITY_TOKEN.test(resolved)) return resolved;
-  } catch {
-    // unreachable / not a .torrent — fall through to the original title
+// Find the movie/series in the *arr for a resolved torrent, keyed by the id
+// Portugas gave us (TMDb for movies, TVDb for series) and falling back to the
+// release name. This is the library item the pushed release attaches to.
+async function lookupItem(meta) {
+  if (meta.isSeries) {
+    const term = meta.tvdbId ? `tvdb:${meta.tvdbId}` : meta.name;
+    return (await sonarr.lookup(term))?.[0] || null;
   }
-  return title;
+  const term = meta.tmdbId ? `tmdb:${meta.tmdbId}` : meta.name;
+  return (await radarr.lookup(term))?.[0] || null;
 }
 
 // Add a looked-up movie/series to the library so a pushed release has something
@@ -77,76 +64,50 @@ async function ensureInLibrary(svc, serviceName, type, item) {
   });
 }
 
-// POST /api/portugas/name  body: { url }
-// Resolve the real release name behind a torrent link (the .torrent's info.name
-// or a magnet's dn) so the UI can seed the release-title field with something the
-// *arr can parse a quality out of — a bare "Enola Holmes 3 2026" parses as
-// Unknown quality and gets refused by the profile.
-router.post('/name', async (req, res) => {
-  const url = (req.body?.url || '').trim();
-  if (!url) return res.status(400).json({ error: 'A torrent link is required' });
-  if (!LINK_RE.test(url)) {
-    return res.status(400).json({ error: 'Link must be a magnet: or http(s):// .torrent URL' });
-  }
-  try {
-    const name = await resolveReleaseName(url);
-    res.json({ name });
-  } catch (err) {
-    res.status(502).json({ error: err.message });
-  }
-});
-
-// POST /api/portugas/grab  body: { url, type, item, title }
-// Grab a specific torrent link (a direct .torrent URL or magnet, typically from
-// Portugas) and get it synced in Radarr/Sonarr rather than orphaned in the
-// download client. Flow: make sure `item` (a Radarr/Sonarr lookup result) is in
-// the library — adding it if needed — then push the release so the *arr grabs it,
-// sends it to the download client, and imports it. `title` is the release name
-// the *arr parses to match the library title (and read quality from).
+// POST /api/portugas/grab  body: { url }
+// Hands-free grab: paste a Portugas link and nothing else. We resolve the torrent
+// via Portugas's API (using the token Prowlarr already holds) to learn the real
+// release name, whether it's a movie or a series, and its TMDb/TVDb ids; add it
+// to Radarr/Sonarr if it isn't there yet; then push the authenticated .torrent so
+// the *arr grabs it, sends it to the download client, and imports it.
 router.post('/grab', async (req, res) => {
   const url = (req.body?.url || '').trim();
-  const type = req.body?.type;
-  const item = req.body?.item;
-  const title = (req.body?.title || '').trim();
-
-  if (!url) return res.status(400).json({ error: 'A torrent link is required' });
-  if (!LINK_RE.test(url)) {
-    return res.status(400).json({ error: 'Link must be a magnet: or http(s):// .torrent URL' });
-  }
-  if (type !== 'movie' && type !== 'series') {
-    return res.status(400).json({ error: 'type must be "movie" or "series"' });
-  }
-  if (!item?.tmdbId) return res.status(400).json({ error: 'Pick a title to attach the torrent to' });
-  if (!title) return res.status(400).json({ error: 'A release title is required' });
-
-  const svc = type === 'movie' ? radarr : sonarr;
-  const serviceName = type === 'movie' ? 'radarr' : 'sonarr';
-  const label = type === 'movie' ? 'Radarr' : 'Sonarr';
-  const isMagnet = /^magnet:/i.test(url);
-  // Safety net for a quality-less title (Unknown → refused): recover the real
-  // release name from the link when we can.
-  const pushTitle = await titleForPush(title, url);
-  const release = {
-    title: pushTitle,
-    protocol: 'torrent',
-    publishDate: new Date().toISOString(),
-    guid: url,
-    ...(isMagnet ? { magnetUrl: url } : { downloadUrl: url })
-  };
+  if (!url) return res.status(400).json({ error: 'Cola um link do Portugas' });
 
   try {
+    const meta = await portugas.resolveTorrent(url);
+    const type = meta.isSeries ? 'series' : 'movie';
+    const svc = meta.isSeries ? sonarr : radarr;
+    const serviceName = meta.isSeries ? 'sonarr' : 'radarr';
+    const label = meta.isSeries ? 'Sonarr' : 'Radarr';
+
+    const item = await lookupItem(meta);
+    if (!item) throw new Error(`${label} não encontrou "${meta.name}" na base de dados`);
+
     const added = await ensureInLibrary(svc, serviceName, type, item);
-    const result = await svc.pushRelease(release);
+    const result = await svc.pushRelease({
+      title: meta.name,
+      protocol: 'torrent',
+      publishDate: new Date().toISOString(),
+      guid: meta.downloadUrl,
+      downloadUrl: meta.downloadUrl
+    });
     const rel = Array.isArray(result) ? result[0] : result;
     if (rel && (rel.rejected || rejectionReasons(rel).length)) {
       const reasons = rejectionReasons(rel);
       return res.status(422).json({
         error: reasons.length
           ? `${label} recusou: ${reasons.join('; ')}`
-          : `${label} não conseguiu associar "${pushTitle}" ao título`
+          : `${label} não conseguiu associar "${meta.name}"`
       });
     }
-    res.json({ ok: true, service: type, added: !item.id, title: added?.title || item.title });
+    res.json({
+      ok: true,
+      service: type,
+      added: !item.id,
+      title: added?.title || item.title,
+      release: meta.name
+    });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

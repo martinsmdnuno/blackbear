@@ -1,123 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link2, Loader2, DownloadCloud, Film, Tv, Search, X, Check } from 'lucide-react';
+import { useState } from 'react';
+import { Link2, Loader2, DownloadCloud } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 
-const LINK_RE = /^(magnet:|https?:\/\/)/i;
+const LINK_RE = /portugas\.org\/.*?\d/i;
 
-const TYPES = [
-  { id: 'movie', label: 'Filme', icon: Film },
-  { id: 'series', label: 'Série', icon: Tv }
-];
-
-const posterOf = (item) => item.images?.find((i) => i.coverType === 'poster')?.remoteUrl || null;
-
-// Deliberate, targeted grab: paste a specific Portugas .torrent link, pick the
-// exact title it's for, and push it through Radarr/Sonarr. The title is added to
-// the library if it isn't there yet, then the torrent is grabbed and imported.
+// Paste a Portugas link, nothing else. The backend resolves the torrent via the
+// Portugas API (with the token Prowlarr already holds), figures out whether it's
+// a movie or a series, adds it to Radarr/Sonarr if needed, and grabs it.
 export default function LinkGrab() {
   const toast = useToast();
   const [url, setUrl] = useState('');
-  const [type, setType] = useState('series');
-  const [term, setTerm] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
-  const [resolvedName, setResolvedName] = useState('');
-  const [resolving, setResolving] = useState(false);
-  const debounce = useRef(null);
-  const nameDebounce = useRef(null);
-  // The user has hand-edited the title field — stop auto-filling it from the link.
-  const titleTouched = useRef(false);
 
   const link = url.trim();
-  const valid = LINK_RE.test(link) && selected && title.trim().length > 0;
-
-  // Resolve the real release name behind the pasted link (the .torrent's
-  // info.name / a magnet's dn). It carries the quality tokens the *arr needs to
-  // parse — seeding the title field with "Enola Holmes 3 2026" instead makes
-  // Radarr parse Unknown quality and refuse the push.
-  useEffect(() => {
-    clearTimeout(nameDebounce.current);
-    if (!LINK_RE.test(link)) {
-      setResolvedName('');
-      setResolving(false);
-      return;
-    }
-    setResolving(true);
-    nameDebounce.current = setTimeout(() => {
-      api
-        .resolveName(link)
-        .then((r) => setResolvedName(r?.name || ''))
-        .catch(() => setResolvedName(''))
-        .finally(() => setResolving(false));
-    }, 500);
-    return () => clearTimeout(nameDebounce.current);
-  }, [link]);
-
-  // Once we know the real name and a title is picked, fill the field with it —
-  // unless the user has already typed their own.
-  useEffect(() => {
-    if (selected && resolvedName && !titleTouched.current) setTitle(resolvedName);
-  }, [resolvedName, selected]);
-
-  // Search Radarr/Sonarr as the user types, so they can pick the exact title
-  // (and resolve same-name/same-year ambiguity) before grabbing.
-  useEffect(() => {
-    if (selected) return; // already picked — no need to keep searching
-    clearTimeout(debounce.current);
-    if (!term.trim()) {
-      setResults([]);
-      return;
-    }
-    setSearching(true);
-    debounce.current = setTimeout(() => {
-      api
-        .search(type, term.trim())
-        .then((r) => setResults(r || []))
-        .catch(() => setResults([]))
-        .finally(() => setSearching(false));
-    }, 450);
-    return () => clearTimeout(debounce.current);
-  }, [term, type, selected]);
-
-  function switchType(next) {
-    setType(next);
-    setSelected(null);
-    setResults([]);
-    setTerm('');
-    setTitle('');
-    titleTouched.current = false;
-  }
-
-  function pick(item) {
-    setSelected(item);
-    setResults([]);
-    setTerm('');
-    titleTouched.current = false;
-    // Prefer the real release name from the link (has quality tokens the *arr can
-    // parse); fall back to title+year until it resolves. The name effect fills it
-    // in later if the link resolves after the pick.
-    setTitle(resolvedName || `${item.title}${item.year ? ` ${item.year}` : ''}`);
-  }
+  const valid = LINK_RE.test(link) && !busy;
 
   async function grab() {
     if (!valid) return;
     setBusy(true);
     try {
-      const res = await api.grabLink(link, type, selected, title.trim());
+      const res = await api.grabLink(link);
+      const service = res.service === 'series' ? 'Sonarr' : 'Radarr';
       toast.success(
-        `${res.added ? 'Adicionado e enviado' : 'Enviado'} para o ${
-          res.service === 'movie' ? 'Radarr' : 'Sonarr'
-        }`
+        `${res.added ? 'Adicionado e enviado' : 'Enviado'} para o ${service}: ${res.title}`
       );
       setUrl('');
-      setSelected(null);
-      setTitle('');
-      setResolvedName('');
-      titleTouched.current = false;
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -134,144 +42,24 @@ export default function LinkGrab() {
         </h3>
       </div>
       <p className="text-xs leading-snug text-silver">
-        Cola o link direto do <span className="text-parchment/80">.torrent</span> do Portugas (com a
-        tua passkey), escolhe o título e é empurrado pelo Radarr/Sonarr — adicionado à biblioteca se
-        ainda não estiver, e importado no fim.
+        Cola o link de um torrent do <span className="text-parchment/80">Portugas</span> e a app trata
+        do resto — descobre se é filme ou série, adiciona ao Radarr/Sonarr se ainda não estiver, e
+        descarrega.
       </p>
 
-      <input
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://portugas.org/download.php?id=…&passkey=…"
-        className="input"
-      />
-
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-night-850 p-1">
-        {TYPES.map((t) => {
-          const Icon = t.icon;
-          const active = type === t.id;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => switchType(t.id)}
-              className={`flex items-center justify-center gap-2 rounded-md py-2 text-sm font-semibold transition
-                          ${active ? 'bg-gold text-night-950' : 'text-silver'}`}
-            >
-              <Icon size={16} />
-              {t.label}
-            </button>
-          );
-        })}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && grab()}
+          placeholder="https://portugas.org/torrents/130418"
+          className="input flex-1"
+        />
+        <button onClick={grab} disabled={!valid} className="btn-gold sm:w-auto">
+          {busy ? <Loader2 size={18} className="animate-spin" /> : <DownloadCloud size={18} />}
+          Descarregar
+        </button>
       </div>
-
-      {/* Title picker: search → pick, then show the chosen title as a chip. */}
-      {selected ? (
-        <div className="flex items-center gap-2.5 rounded-lg bg-night-900 p-2">
-          <div className="h-14 w-10 shrink-0 overflow-hidden rounded bg-night-800">
-            {posterOf(selected) && (
-              <img src={posterOf(selected)} alt="" className="h-full w-full object-cover" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1 text-sm font-semibold text-parchment">
-              <Check size={13} className="text-emerald-400" />
-              <span className="truncate">{selected.title}</span>
-            </p>
-            <p className="text-xs text-silver">
-              {selected.year || '—'} · {selected.id ? 'já na biblioteca' : 'será adicionado'}
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setSelected(null);
-              setTitle('');
-              titleTouched.current = false;
-            }}
-            className="rounded-lg p-1 text-silver hover:text-parchment"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-silver" />
-            <input
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              placeholder={`Procurar ${type === 'movie' ? 'o filme' : 'a série'}…`}
-              className="input pl-9"
-            />
-            {searching && (
-              <Loader2
-                size={16}
-                className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gold"
-              />
-            )}
-          </div>
-          {results.length > 0 && (
-            <div className="max-h-56 space-y-1 overflow-y-auto">
-              {results.slice(0, 8).map((item) => (
-                <button
-                  key={item.tmdbId || item.tvdbId || item.titleSlug}
-                  onClick={() => pick(item)}
-                  className="flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition hover:bg-night-800"
-                >
-                  <div className="h-12 w-8 shrink-0 overflow-hidden rounded bg-night-800">
-                    {posterOf(item) && (
-                      <img src={posterOf(item)} alt="" loading="lazy" className="h-full w-full object-cover" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-parchment">{item.title}</p>
-                    <p className="text-xs text-silver">
-                      {item.year || '—'}
-                      {item.id ? ' · já na biblioteca' : ''}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {selected && (
-        <div className="space-y-1">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative flex-1">
-              <input
-                value={title}
-                onChange={(e) => {
-                  titleTouched.current = true;
-                  setTitle(e.target.value);
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && grab()}
-                placeholder="Nome do release (ex.: Obsession.2026.1080p.WEB-DL…)"
-                className="input w-full"
-              />
-              {resolving && (
-                <Loader2
-                  size={16}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gold"
-                />
-              )}
-            </div>
-            <button onClick={grab} disabled={!valid || busy} className="btn-gold sm:w-auto">
-              {busy ? <Loader2 size={18} className="animate-spin" /> : <DownloadCloud size={18} />}
-              Descarregar
-            </button>
-          </div>
-          <p className="text-xs leading-snug text-silver">
-            {resolving
-              ? 'A obter o nome do release do link…'
-              : resolvedName
-                ? 'Nome obtido do .torrent — o Radarr/Sonarr lê a qualidade daqui.'
-                : 'Sem nome automático — cola o nome completo do release (com 1080p/WEB-DL…) para o *arr aceitar.'}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

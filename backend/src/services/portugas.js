@@ -1,5 +1,7 @@
 import * as radarr from './radarr.js';
 import * as sonarr from './sonarr.js';
+import * as prowlarr from './prowlarr.js';
+import { httpRequest } from './http.js';
 
 // The Portugas guard. Portugas is a private PT tracker with strict Hit & Run
 // rules, so we don't want it grabbed for everything — only for the few titles
@@ -91,3 +93,71 @@ async function bothServices(fn) {
 
 export const status = () => bothServices(serviceStatus);
 export const setup = () => bothServices(serviceSetup);
+
+// --- Grab-by-link resolver -------------------------------------------------
+//
+// A Portugas download/details link is behind login, so neither we nor the *arr
+// can fetch it raw. But Prowlarr already holds the Portugas indexer *with* its
+// UNIT3D API token — we read that token back and hit Portugas's own API to
+// resolve a torrent id into everything needed to grab it hands-free: the real
+// release name (with quality), whether it's a movie or a series, TMDb/TVDb ids
+// to add it to the library, and an authenticated .torrent download link.
+
+// Matches the torrent id in any Portugas link shape: /torrents/download/130418,
+// /torrent/download/130418.<rsskey>, or the details page /torrents/130418.
+const TORRENT_ID_RE = /\/torrents?\/(?:download\/)?(\d+)/i;
+
+// Pull the Portugas UNIT3D API token (and base URL) out of the Prowlarr indexer.
+async function portugasCreds() {
+  const all = await prowlarr.indexers();
+  const match = (all || []).find((i) => matchesPortugas(i.name));
+  if (!match) throw new Error('Indexer Portugas não encontrado no Prowlarr');
+  const full = await prowlarr.indexer(match.id);
+  const fieldValue = (name) => (full.fields || []).find((f) => f.name === name)?.value;
+  const apikey = fieldValue('apikey');
+  const baseUrl = (
+    fieldValue('baseUrl') ||
+    full.indexerUrls?.[0] ||
+    'https://portugas.org'
+  ).replace(/\/+$/, '');
+  if (!apikey) throw new Error('Portugas sem API token no Prowlarr');
+  return { apikey, baseUrl };
+}
+
+// UNIT3D categories are per-tracker, so key off the category name (PT/EN) and
+// fall back to a TVDb id (which only series carry) when it's ambiguous.
+function looksLikeSeries(category, tvdbId) {
+  if (/\b(s[ée]ries?|tv|show|temporada|epis[oó]dio)\b/i.test(category)) return true;
+  if (/\b(filmes?|movies?)\b/i.test(category)) return false;
+  return tvdbId > 0;
+}
+
+// Resolve a pasted Portugas link into a grab-ready descriptor.
+export async function resolveTorrent(link) {
+  const m = String(link || '').match(TORRENT_ID_RE);
+  if (!m) throw new Error('Link do Portugas inválido (não encontrei o id do torrent)');
+  const id = m[1];
+
+  const { apikey, baseUrl } = await portugasCreds();
+  const res = await httpRequest(`${baseUrl}/api/torrents/${id}`, {
+    label: 'Portugas',
+    timeout: 15000,
+    headers: { Authorization: `Bearer ${apikey}`, Accept: 'application/json' }
+  });
+  const a = JSON.parse(await res.text())?.attributes || {};
+  if (!a.name || !a.download_link) throw new Error('Portugas não devolveu dados deste torrent');
+
+  const tvdbId = Number(a.tvdb_id) || 0;
+  const category = String(a.category || '');
+  return {
+    id,
+    name: a.name,
+    year: Number(a.release_year) || undefined,
+    tmdbId: Number(a.tmdb_id) || 0,
+    tvdbId,
+    imdbId: a.imdb_id ? String(a.imdb_id) : '',
+    category,
+    downloadUrl: a.download_link,
+    isSeries: looksLikeSeries(category, tvdbId)
+  };
+}
