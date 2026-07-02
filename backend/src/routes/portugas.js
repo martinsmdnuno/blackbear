@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as portugas from '../services/portugas.js';
 import { tagIdFor } from '../services/portugas.js';
+import { resolveReleaseName } from '../services/torrent.js';
 import * as radarr from '../services/radarr.js';
 import * as sonarr from '../services/sonarr.js';
 
@@ -53,6 +54,25 @@ async function ensureInLibrary(svc, serviceName, type, item) {
     addOptions: { monitor: 'all', searchForMissingEpisodes: false, searchForCutoffUnmetEpisodes: false }
   });
 }
+
+// POST /api/portugas/name  body: { url }
+// Resolve the real release name behind a torrent link (the .torrent's info.name
+// or a magnet's dn) so the UI can seed the release-title field with something the
+// *arr can parse a quality out of — a bare "Enola Holmes 3 2026" parses as
+// Unknown quality and gets refused by the profile.
+router.post('/name', async (req, res) => {
+  const url = (req.body?.url || '').trim();
+  if (!url) return res.status(400).json({ error: 'A torrent link is required' });
+  if (!LINK_RE.test(url)) {
+    return res.status(400).json({ error: 'Link must be a magnet: or http(s):// .torrent URL' });
+  }
+  try {
+    const name = await resolveReleaseName(url);
+    res.json({ name });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
 
 // POST /api/portugas/grab  body: { url, type, item, title }
 // Grab a specific torrent link (a direct .torrent URL or magnet, typically from
