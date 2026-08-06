@@ -97,4 +97,14 @@ export async function image(itemId) {
 
 export const systemInfo = () => get('/System/Info');
 
-export default { resume, latest, watchedTmdb, image, systemInfo };
+// Kick off a full library scan so deleted files disappear right away.
+export const refreshLibrary = () => {
+  const { url, apiKey } = base();
+  return httpRequest(`${url}/Library/Refresh`, {
+    method: 'POST',
+    label: 'Jellyfin',
+    headers: { 'X-Emby-Token': apiKey }
+  });
+};
+
+export default { resume, latest, watchedTmdb, image, systemInfo, refreshLibrary };

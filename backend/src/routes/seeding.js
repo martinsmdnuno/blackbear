@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import * as qbit from '../services/qbittorrent.js';
+import * as radarr from '../services/radarr.js';
+import * as sonarr from '../services/sonarr.js';
+import * as jellyfin from '../services/jellyfin.js';
 import { getAppConfig } from '../config.js';
 import { MIN_RATIO, MIN_SEED_HOURS, isComplete, busyHashes } from '../services/cleanup.js';
 
@@ -116,10 +119,51 @@ router.get('/', async (_req, res) => {
   }
 });
 
+// Remove the library side of a torrent: the Radarr movie, or the Sonarr episode
+// files it was imported as. Because imports are hardlinks, the torrent's files
+// and the library's files are the same data under two names — disk space is
+// only freed once both are gone. Returns a description of what was removed, or
+// null when the torrent was never imported (e.g. added by hand).
+async function removeFromLibrary(hash) {
+  const downloadId = hash.toUpperCase();
+
+  try {
+    const h = await radarr.historyForDownload(downloadId);
+    const movieIds = [...new Set((h?.records || []).map((r) => r.movieId).filter(Boolean))];
+    if (movieIds.length) {
+      for (const id of movieIds) await radarr.deleteMovie(id, true);
+      return `movie removed from Radarr (files included)`;
+    }
+  } catch {
+    // Radarr unreachable or history gone — fall through to Sonarr
+  }
+
+  try {
+    const h = await sonarr.historyForDownload(downloadId);
+    const episodeIds = [...new Set((h?.records || []).map((r) => r.episodeId).filter(Boolean))];
+    if (episodeIds.length) {
+      // Unmonitor BEFORE deleting files, or Sonarr immediately re-grabs them.
+      await sonarr.unmonitorEpisodes(episodeIds);
+      const fileIds = new Set();
+      for (const id of episodeIds) {
+        const ep = await sonarr.episode(id).catch(() => null);
+        if (ep?.episodeFileId) fileIds.add(ep.episodeFileId);
+      }
+      for (const f of fileIds) await sonarr.deleteEpisodeFile(f).catch(() => {});
+      return `${episodeIds.length} episode(s) unmonitored, ${fileIds.size} file(s) removed from Sonarr`;
+    }
+  } catch {
+    // Sonarr unreachable — nothing more we can map
+  }
+
+  return null;
+}
+
 // POST /api/seeding/delete  { hashes: [...] }
-// Re-validates every hash against a fresh survey before touching qBittorrent,
-// so a stale or hand-crafted request can never delete a protected torrent.
-// Files are always deleted too — freeing disk space is the point.
+// Re-validates every hash against a fresh survey before touching anything, so
+// a stale or hand-crafted request can never delete a protected torrent. Then
+// deletes EVERYWHERE: the library entry and files (Radarr/Sonarr), the torrent
+// and its files (qBittorrent), and finally kicks a Jellyfin library refresh.
 router.post('/delete', async (req, res) => {
   const hashes = Array.isArray(req.body?.hashes)
     ? req.body.hashes.map((h) => String(h).toLowerCase())
@@ -146,11 +190,17 @@ router.post('/delete', async (req, res) => {
         continue;
       }
       try {
+        const library = await removeFromLibrary(h);
         await qbit.remove(h, true);
-        deleted.push({ hash: h, name: item.name, size: item.size });
+        deleted.push({ hash: h, name: item.name, size: item.size, library });
       } catch (err) {
         skipped.push({ hash: h, name: item.name, reason: err.message });
       }
+    }
+    if (deleted.length) {
+      // Best-effort: make the titles vanish from Jellyfin without waiting for
+      // its scheduled scan.
+      await jellyfin.refreshLibrary().catch(() => {});
     }
     res.json({ deleted, skipped });
   } catch (err) {

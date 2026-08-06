@@ -18,6 +18,11 @@ export const deleteMovie = (id, deleteFiles) =>
 
 export const queue = () => client.get('/queue?pageSize=100');
 
+// Everything Radarr recorded for one download client id (torrent hash) — used
+// to map a seeded torrent back to the movie it was imported as.
+export const historyForDownload = (downloadId) =>
+  client.get(`/history?page=1&pageSize=50&downloadId=${encodeURIComponent(downloadId)}`);
+
 // Remove a queue item, blocklisting the release so Radarr grabs a different one.
 export const removeQueueItem = (id) =>
   client.del(`/queue/${id}?removeFromClient=true&blocklist=true&skipRedownload=false`);
