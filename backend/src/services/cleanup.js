@@ -10,16 +10,16 @@ let lastRun = null;
 // for at least 168h (7 days) before it may be removed. We clamp the configured
 // values to these minimums so a misconfig (UI bypass, hand-edited config.json)
 // can never make the cleanup delete a torrent early and earn an HnR strike.
-const MIN_RATIO = 1.0;
-const MIN_SEED_HOURS = 168;
+export const MIN_RATIO = 1.0;
+export const MIN_SEED_HOURS = 168;
 
-function isComplete(t) {
+export function isComplete(t) {
   return t.progress >= 1 || (t.completed > 0 && t.completed >= t.size);
 }
 
 // Hashes still being handled by Sonarr/Radarr (downloading or importing) — never
 // remove those, or we'd delete a torrent mid-import.
-async function busyHashes() {
+export async function busyHashes() {
   const set = new Set();
   const collect = (q) => {
     for (const r of q?.records || []) {
