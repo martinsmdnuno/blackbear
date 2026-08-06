@@ -24,7 +24,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - servarr_default
-    restart: unless-stopped
+    restart: always
 
   blackbeard-web:
     build: ./frontend
@@ -35,7 +35,7 @@ services:
       - blackbeard-api
     networks:
       - servarr_default
-    restart: unless-stopped
+    restart: always
 
   # Optional remote access via Cloudflare Tunnel. Start with:
   #   docker compose --profile cloudflare up -d
@@ -52,7 +52,7 @@ services:
       - blackbeard-web
     networks:
       - servarr_default
-    restart: unless-stopped
+    restart: always
     profiles: ["cloudflare"]
 
 # Join the existing servarr stack network so containers are reachable by name.
