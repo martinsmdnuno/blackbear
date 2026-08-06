@@ -46,6 +46,29 @@ async function announceUrls(t) {
   return urls;
 }
 
+// Classify a torrent as movie or series and, for series, pull out a clean
+// series title + season number so the UI can group episodes. The qBittorrent
+// category ("movies"/"tv") is authoritative when present; the SxxEyy / Season N
+// pattern in the release name fills in the rest.
+function parseMedia(name, category) {
+  const cat = (category || '').toLowerCase();
+  const n = String(name || '');
+  const m =
+    n.match(/^(.*?)[\s._-]*\bS(\d{1,2})(?=[\s._-]?E\d|\b)/i) ||
+    n.match(/^(.*?)[\s._-]*\b(?:Season|Temporada)[\s._-]*(\d{1,2})\b/i);
+  const seriesCat = /\b(tv|sonarr|series)\b/.test(cat);
+  const movieCat = /\b(movies?|radarr|filmes?)\b/.test(cat);
+  if (movieCat && !seriesCat) return { mediaType: 'movie', seriesTitle: null, season: null };
+  if (seriesCat || m) {
+    const raw = (m?.[1] || n)
+      .replace(/[._]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return { mediaType: 'series', seriesTitle: raw || n, season: m ? Number(m[2]) : null };
+  }
+  return { mediaType: 'movie', seriesTitle: null, season: null };
+}
+
 // The same floors the auto cleanup enforces (Portugas rule 4.2.1) — a torrent
 // only shows up as deletable once it could not possibly earn an HnR strike.
 function thresholds() {
@@ -96,6 +119,7 @@ async function survey() {
       name: t.name,
       size: t.size,
       category: t.category || '',
+      ...parseMedia(t.name, t.category),
       trackerHost: hostOf(urls[0]),
       ratio: Math.round((t.ratio ?? 0) * 100) / 100,
       seededHours: Math.round(seededSec / 3600),

@@ -31,7 +31,9 @@ export default function App() {
     <div className="flex min-h-screen bg-night-900">
       <Sidebar tabs={TABS} active={active} onChange={setActive} />
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      {/* min-w-0 lets long unbreakable strings (torrent names) truncate instead
+          of forcing the whole page wider than the viewport on mobile. */}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         {/* Mobile header */}
         <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-gold/20 bg-night-850/95 px-4 py-3 backdrop-blur md:hidden">
           <img
