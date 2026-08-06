@@ -16,6 +16,20 @@ export const allSeries = () => client.get('/series');
 export const deleteSeries = (id, deleteFiles) =>
   client.del(`/series/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`);
 
+// Map a torrent hash back to the episodes it was imported as.
+export const historyForDownload = (downloadId) =>
+  client.get(
+    `/history?page=1&pageSize=100&downloadId=${encodeURIComponent(downloadId)}&includeEpisode=true`
+  );
+
+export const episode = (id) => client.get(`/episode/${id}`);
+
+// Unmonitor first, or Sonarr re-grabs the episodes as soon as the file is gone.
+export const unmonitorEpisodes = (episodeIds) =>
+  client.put('/episode/monitor', { episodeIds, monitored: false });
+
+export const deleteEpisodeFile = (id) => client.del(`/episodefile/${id}`);
+
 export const queue = () =>
   client.get('/queue?includeUnknownSeriesItems=true&pageSize=100');
 

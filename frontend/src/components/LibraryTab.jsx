@@ -90,8 +90,9 @@ export default function LibraryTab() {
     const total = bytes(items.reduce((s, i) => s + (i.size || 0), 0));
     if (
       !window.confirm(
-        `Delete ${label} from qBittorrent including downloaded files (${total})?\n\n` +
-          'The imported copy in your library (Radarr/Sonarr/Jellyfin) is not touched.'
+        `Delete ${label} everywhere (${total})?\n\n` +
+          'Removes the torrent and its files, plus the movie/episodes from your ' +
+          'library (Radarr/Sonarr, files included). It will also disappear from Jellyfin.'
       )
     )
       return;
@@ -99,10 +100,11 @@ export default function LibraryTab() {
     try {
       const res = await api.seedingDelete(items.map((i) => i.hash));
       if (res.deleted.length) {
+        const fromLibrary = res.deleted.filter((d) => d.library).length;
         toast.success(
-          `Removed ${res.deleted.length} torrent(s) — freed up to ${bytes(
-            res.deleted.reduce((s, d) => s + (d.size || 0), 0)
-          )}`
+          `Removed ${res.deleted.length} torrent(s)` +
+            (fromLibrary ? ` (${fromLibrary} also from the library)` : '') +
+            ` — freed ${bytes(res.deleted.reduce((s, d) => s + (d.size || 0), 0))}`
         );
       }
       if (res.skipped.length) {
@@ -234,8 +236,10 @@ export default function LibraryTab() {
         {Math.round(th.seedHours / 24)} days of seeding — the same Hit &amp; Run-safe floors the
         auto cleanup uses. Portugas torrents are <span className="text-parchment">never</span>{' '}
         listed or deletable from this screen, and every delete is re-checked on the server.
-        Deleting removes the torrent and its files from the Torrents folder; your imported
-        library copy stays.
+        Deleting removes the title <span className="text-parchment">everywhere</span>: the
+        torrent and its files, the Radarr movie or Sonarr episodes (files included, episodes
+        unmonitored so nothing gets re-downloaded), and Jellyfin is refreshed so it disappears
+        there too.
       </p>
     </div>
   );
