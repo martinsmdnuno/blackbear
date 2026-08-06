@@ -59,6 +59,10 @@ export const api = {
 
   libraryIds: () => req('/library/ids'),
 
+  seeding: () => req('/seeding'),
+  seedingDelete: (hashes) =>
+    req('/seeding/delete', { method: 'POST', body: JSON.stringify({ hashes }) }),
+
   diagnostics: () => req('/diagnostics'),
   logs: (service, tail = 200) => req(`/diagnostics/logs/${service}?tail=${tail}`),
   restart: (service) => req(`/diagnostics/restart/${service}`, { method: 'POST' })

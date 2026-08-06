@@ -125,4 +125,6 @@ export const remove = (hashes, deleteFiles = false) =>
     form: { hashes, deleteFiles: deleteFiles ? 'true' : 'false' }
   });
 
-export default { version, listTorrents, pause, resume, remove };
+export const trackers = (hash) => callJson(`/api/v2/torrents/trackers?hash=${hash}`);
+
+export default { version, listTorrents, pause, resume, remove, trackers };

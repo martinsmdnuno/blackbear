@@ -14,6 +14,7 @@ import jellyfinRoutes from './routes/jellyfin.js';
 import settingsRoutes from './routes/settings.js';
 import portugasRoutes from './routes/portugas.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
+import seedingRoutes from './routes/seeding.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -37,6 +38,7 @@ app.use('/api/jellyfin', jellyfinRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/portugas', portugasRoutes);
 app.use('/api/diagnostics', diagnosticsRoutes);
+app.use('/api/seeding', seedingRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('[error]', err);
