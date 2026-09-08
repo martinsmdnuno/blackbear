@@ -27,6 +27,23 @@ async function lookupItem(meta) {
   return (await radarr.lookup(term))?.[0] || null;
 }
 
+// Portugas releases are dubbed or subbed in Portuguese, so a profile that wants
+// the film's *original* language refuses them outright: "Original Language
+// (English) is wanted, but found Portuguese". Pick a profile that accepts
+// Portuguese, then one that accepts anything, before settling for the first.
+// Sonarr dropped the profile-level language, so there the lookups just miss and
+// we fall through — which is correct, it has nothing to reject on.
+const ANY_LANGUAGE_ID = -1;
+
+function profileForPortugas(profiles) {
+  const language = (p) => p?.language;
+  return (
+    profiles.find((p) => /^portuguese/i.test(language(p)?.name || '')) ||
+    profiles.find((p) => language(p)?.id === ANY_LANGUAGE_ID) ||
+    profiles[0]
+  );
+}
+
 // Add a looked-up movie/series to the library so a pushed release has something
 // to attach to. Search is left OFF — we don't want the *arr auto-grabbing some
 // other release before/alongside the specific torrent the user chose. Tagged for
@@ -42,7 +59,7 @@ async function ensureInLibrary(svc, serviceName, type, item) {
   const tags = [await tagIdFor(serviceName)];
   const base = {
     ...item,
-    qualityProfileId: profiles[0].id,
+    qualityProfileId: profileForPortugas(profiles).id,
     rootFolderPath: folders[0].path,
     monitored: true,
     tags
