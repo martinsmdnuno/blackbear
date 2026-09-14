@@ -25,6 +25,23 @@ export function createArrClient(serviceName, apiBase, label) {
     });
   }
 
+  // Walk a paged *arr endpoint (history, wanted…) and return every record.
+  // Capped so a runaway totalRecords can never loop forever.
+  async function allPages(path, { pageSize = 1000, maxPages = 50, ...options } = {}) {
+    const sep = path.includes('?') ? '&' : '?';
+    const records = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const res = await request(`${path}${sep}page=${page}&pageSize=${pageSize}`, {
+        ...options,
+        method: 'GET'
+      });
+      const batch = res?.records || [];
+      records.push(...batch);
+      if (batch.length < pageSize || records.length >= (res?.totalRecords ?? 0)) break;
+    }
+    return records;
+  }
+
   return {
     label,
     apiBase,
@@ -34,6 +51,7 @@ export function createArrClient(serviceName, apiBase, label) {
       request(path, { ...options, method: 'POST', body: JSON.stringify(body) }),
     put: (path, body, options) =>
       request(path, { ...options, method: 'PUT', body: JSON.stringify(body) }),
-    del: (path, options) => request(path, { ...options, method: 'DELETE' })
+    del: (path, options) => request(path, { ...options, method: 'DELETE' }),
+    allPages
   };
 }

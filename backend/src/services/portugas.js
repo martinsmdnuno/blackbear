@@ -27,6 +27,11 @@ const svcByName = { radarr, sonarr };
 
 const matchesPortugas = (name) => (name || '').toLowerCase().includes(INDEXER_MATCH);
 
+// Torrent-side counterpart: does any of a torrent's announce URLs point at
+// Portugas? Shared by every screen that can delete torrents, so the HnR
+// protection can't drift between them.
+export const isPortugasTracker = (urls) => (urls || []).some((u) => matchesPortugas(u));
+
 async function findTag(svc) {
   const all = await svc.tags();
   return (all || []).find((t) => (t.label || '').toLowerCase() === TAG_LABEL) || null;

@@ -18,8 +18,17 @@ services:
       # - QBITTORRENT_URL=http://qbittorrent:8080
       # - QBITTORRENT_USERNAME=admin
       # - QBITTORRENT_PASSWORD=
+      # Library: tracker hostnames treated as private when qBittorrent can't say
+      # (comma-separated, set in .env). Read live, not just seeded.
+      - PRIVATE_TRACKERS=${PRIVATE_TRACKERS:-}
     volumes:
       - ./config:/config
+      # Library: audit log of deletions (logs/deletions.json).
+      - ./logs:/app/logs
+      # Library: the media disk, read-only, at the same /data path Radarr and
+      # Sonarr use — lets the backend stat() files for hardlink counts. Nothing
+      # is ever deleted through this mount; deletes go through the service APIs.
+      - /Volumes/ALBATROZ:/data:ro
       # Needed only for the "Restart container" / "Logs" diagnostics.
       - /var/run/docker.sock:/var/run/docker.sock
     networks:

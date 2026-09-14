@@ -5,13 +5,9 @@ import * as sonarr from '../services/sonarr.js';
 import * as jellyfin from '../services/jellyfin.js';
 import { getAppConfig } from '../config.js';
 import { MIN_RATIO, MIN_SEED_HOURS, isComplete, busyHashes } from '../services/cleanup.js';
+import { isPortugasTracker } from '../services/portugas.js';
 
 const router = Router();
-
-// Trackers whose torrents must never be offered for deletion here. Portugas is
-// a private tracker (Hit & Run rules, seeding bonus) — its torrents are managed
-// by the HnR-safe auto cleanup only, never from this screen.
-const PROTECTED_TRACKERS = [/portugas/i];
 
 function hostOf(url) {
   try {
@@ -103,8 +99,9 @@ async function survey() {
   for (const t of torrents) {
     if (!isComplete(t)) continue;
     const urls = await announceUrls(t);
-    const isProtected =
-      !urls.length || urls.some((u) => PROTECTED_TRACKERS.some((re) => re.test(u)));
+    // Portugas is a private tracker (Hit & Run rules, seeding bonus) — its
+    // torrents are managed by the HnR-safe auto cleanup only, never from here.
+    const isProtected = !urls.length || isPortugasTracker(urls);
     if (isProtected) {
       protectedCount++;
       continue;

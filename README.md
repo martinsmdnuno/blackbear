@@ -39,10 +39,17 @@ The app, in six areas:
 4. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
    Bazarr wanted-subtitle counts, auto-refreshing every 5s. Includes a one-tap "Search
    wanted subtitles" that runs Bazarr's missing-subtitle tasks.
-5. **Library** — browse everything in Radarr/Sonarr (size on disk, filterable). When Jellyfin
-   is connected: **Continue watching** + **Recently added** rows, a **Watched** badge and a
-   "watched only" filter (to find what's safe to delete). Delete a title removes it from the
-   *arr and, optionally, its files from disk (confirmation dialog + "delete files" checkbox).
+5. **Library** — every movie and series on disk in one list, biggest first (sort by size or
+   date, filter by type / private tracker / still seeding, search, total space on top). Each
+   title is tied to its torrent(s) through the Radarr/Sonarr import history (never by file
+   name), with an amber **private tracker** badge showing ratio and seed time. Deleting runs a
+   cascade — torrent + its files in qBittorrent first, then the title + files in Radarr/Sonarr —
+   behind a confirmation sheet that shows each step, the space that **really** comes back
+   (hardlinks count once), a second confirmation for private trackers and a typed title below
+   ratio 1.0. Portugas torrents can't be deleted before the Hit & Run floors (ratio 1 or 7 days
+   seeded) — checked on the server. A **Simulation** toggle runs everything as a dry run, and
+   every real delete is logged to `logs/deletions.json`. The **Torrents** view lists finished
+   torrents that have met their seeding goals.
 6. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
    as "Saved ✓"), test connections, optional **auto-cleanup** (remove a finished torrent once
    it hits a ratio **or** a max seed time — whichever first — freeing space; skips anything
@@ -180,7 +187,7 @@ If you'd rather pre-fill the first `config.json`, set any of these on the backen
 its first start (also listed, commented, in `docker-compose.yml`):
 
 ```
-PORT, CONFIG_PATH, DOCKER_SOCKET
+PORT, CONFIG_PATH, DOCKER_SOCKET, LOGS_PATH, PRIVATE_TRACKERS
 SONARR_URL, SONARR_API_KEY, SONARR_CONTAINER
 RADARR_URL, RADARR_API_KEY, RADARR_CONTAINER
 PROWLARR_URL, PROWLARR_API_KEY, PROWLARR_CONTAINER
@@ -241,10 +248,21 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 
 | Method | Path                                       | Purpose                                       |
 |--------|--------------------------------------------|-----------------------------------------------|
-| GET    | `/api/library`                             | All Radarr movies + Sonarr series (size + watched) |
+| GET    | `/api/library`                             | Movies + series with files on disk, with torrents, private flag, hardlink state |
 | GET    | `/api/library/ids`                         | Owned TMDb ids (to flag "in library" elsewhere) |
-| DELETE | `/api/library/movie/:id?deleteFiles=true`  | Delete a movie from Radarr (and disk)         |
-| DELETE | `/api/library/series/:id?deleteFiles=true` | Delete a series from Sonarr (and disk)        |
+| POST   | `/api/library/movie\|series/:id/delete`    | Cascade delete (torrent, then *arr). Body below |
+| GET    | `/api/seeding`                             | Finished torrents, split into deletable / still seeding |
+| POST   | `/api/seeding/delete`                      | Delete finished torrents `{ hashes }` everywhere |
+
+Delete body: `{ deleteFiles, deleteTorrent, addExclusion, dryRun, confirmTitle }`. `dryRun`
+returns the plan (steps, space freed, guards) without touching anything; a real run returns
+a result per step and stops at the first failure. `409` = refused by a guard (still importing,
+Portugas below the Hit & Run floors, or a private torrent under ratio 1 without the typed title).
+
+The backend needs the media disk mounted read-only at the same `/data` path Radarr/Sonarr use
+(for hardlink counts) and `./logs` for the deletion log — both are in `docker-compose.yml`.
+`PRIVATE_TRACKERS=host1.tld,host2.tld` (in `.env`) is the fallback private-tracker list for
+qBittorrent versions that don't report it themselves.
 
 ### Jellyfin
 
