@@ -7,7 +7,7 @@
 **Command your home media server from your phone.** 🏴‍☠️
 
 A mobile-first, installable web app that unifies the *arr stack — Sonarr, Radarr,
-Prowlarr, Bazarr and qBittorrent — behind one dark, pirate-themed interface.
+Lidarr, Prowlarr, Bazarr and qBittorrent — behind one dark, pirate-themed interface.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-C9A055.svg)](LICENSE)
 &nbsp;![React](https://img.shields.io/badge/React-18-0C1B33?logo=react&logoColor=61DAFB)
@@ -80,8 +80,8 @@ it fullscreen like a native app (PWA manifest, no input-focus zoom, no overscrol
                  ┌────────▼─────────┐
                  │  blackbeard-api  │  (Node + Express)
                  └────────┬─────────┘
-        ┌──────────┬──────┴───┬──────────┬─────────────┐
-     Sonarr     Radarr     Prowlarr    Bazarr      qBittorrent
+      ┌────────┬────────┬─┴───────┬─────────┬──────────┐
+   Sonarr   Radarr   Lidarr   Prowlarr   Bazarr   qBittorrent
 ```
 
 The **backend is the only thing that holds API keys** — the frontend never sees them.
@@ -172,6 +172,7 @@ Where to find each API key:
 |-------------|---------------------------------------------------------------------------------|
 | Sonarr      | Settings → General → **API Key**                                                |
 | Radarr      | Settings → General → **API Key**                                                |
+| Lidarr      | Settings → General → **API Key**. Music library (artists/albums/FLAC)           |
 | Prowlarr    | Settings → General → **API Key**                                                |
 | Bazarr      | Settings → General → **API Key** (header is `X-API-KEY`)                        |
 | qBittorrent | No API key — uses the Web UI **username + password** (default user `admin`)     |
@@ -190,6 +191,7 @@ its first start (also listed, commented, in `docker-compose.yml`):
 PORT, CONFIG_PATH, DOCKER_SOCKET, LOGS_PATH, PRIVATE_TRACKERS
 SONARR_URL, SONARR_API_KEY, SONARR_CONTAINER
 RADARR_URL, RADARR_API_KEY, RADARR_CONTAINER
+LIDARR_URL, LIDARR_API_KEY, LIDARR_CONTAINER
 PROWLARR_URL, PROWLARR_API_KEY, PROWLARR_CONTAINER
 BAZARR_URL, BAZARR_API_KEY, BAZARR_CONTAINER
 QBITTORRENT_URL, QBITTORRENT_USERNAME, QBITTORRENT_PASSWORD, QBITTORRENT_CONTAINER

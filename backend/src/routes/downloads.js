@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as qbit from '../services/qbittorrent.js';
 import * as sonarr from '../services/sonarr.js';
 import * as radarr from '../services/radarr.js';
+import * as lidarr from '../services/lidarr.js';
 import * as bazarr from '../services/bazarr.js';
 
 const router = Router();
@@ -51,13 +52,15 @@ function mapQueueRecord(r) {
 
 // GET /api/downloads
 router.get('/', async (_req, res) => {
-  const [torrents, sonarrQueue, radarrQueue, wantedMovies, wantedEpisodes] = await Promise.all([
-    settle(qbit.listTorrents, []),
-    settle(sonarr.queue, { records: [] }),
-    settle(radarr.queue, { records: [] }),
-    settle(bazarr.wantedMovies, { total: 0 }),
-    settle(bazarr.wantedEpisodes, { total: 0 })
-  ]);
+  const [torrents, sonarrQueue, radarrQueue, lidarrQueue, wantedMovies, wantedEpisodes] =
+    await Promise.all([
+      settle(qbit.listTorrents, []),
+      settle(sonarr.queue, { records: [] }),
+      settle(radarr.queue, { records: [] }),
+      settle(lidarr.queue, { records: [] }),
+      settle(bazarr.wantedMovies, { total: 0 }),
+      settle(bazarr.wantedEpisodes, { total: 0 })
+    ]);
 
   res.json({
     torrents: {
@@ -71,6 +74,10 @@ router.get('/', async (_req, res) => {
     radarrQueue: {
       items: (radarrQueue.data?.records || []).map(mapQueueRecord),
       error: radarrQueue.error || null
+    },
+    lidarrQueue: {
+      items: (lidarrQueue.data?.records || []).map(mapQueueRecord),
+      error: lidarrQueue.error || null
     },
     bazarr: {
       wantedMovies: wantedMovies.data?.total ?? 0,

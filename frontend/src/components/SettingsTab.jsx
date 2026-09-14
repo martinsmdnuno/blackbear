@@ -25,6 +25,7 @@ import { bytes } from '../lib/format.js';
 const SERVICE_LABELS = {
   sonarr: 'Sonarr',
   radarr: 'Radarr',
+  lidarr: 'Lidarr (Music)',
   prowlarr: 'Prowlarr',
   bazarr: 'Bazarr',
   qbittorrent: 'qBittorrent',
@@ -34,7 +35,7 @@ const SERVICE_LABELS = {
 
 // Services backed by a Docker container (i.e. that support restart/logs).
 // TMDb is a cloud API, so it's excluded from the Containers panel.
-const CONTAINER_SERVICES = ['sonarr', 'radarr', 'prowlarr', 'bazarr', 'qbittorrent'];
+const CONTAINER_SERVICES = ['sonarr', 'radarr', 'lidarr', 'prowlarr', 'bazarr', 'qbittorrent'];
 
 /* ----------------------------- Settings panel ----------------------------- */
 
@@ -45,6 +46,7 @@ function ServiceForm({ name, value, onChange }) {
   const isQbit = name === 'qbittorrent';
   const isTmdb = name === 'tmdb';
   const isJellyfin = name === 'jellyfin';
+  const isLidarr = name === 'lidarr';
   const configured = value.apiKeyConfigured || value.passwordConfigured;
 
   async function test() {
@@ -171,6 +173,13 @@ function ServiceForm({ name, value, onChange }) {
       {isTmdb && (
         <p className="text-xs text-silver">
           Free API key from themoviedb.org → Settings → API. Powers the Trending tab.
+        </p>
+      )}
+
+      {isLidarr && (
+        <p className="text-xs text-silver">
+          API key from Lidarr → Settings → General. Manages the music library (artists, albums
+          and FLAC track files) the same way Radarr manages movies.
         </p>
       )}
 

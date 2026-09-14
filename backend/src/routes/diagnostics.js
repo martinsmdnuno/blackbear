@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as sonarr from '../services/sonarr.js';
 import * as radarr from '../services/radarr.js';
+import * as lidarr from '../services/lidarr.js';
 import * as prowlarr from '../services/prowlarr.js';
 import * as bazarr from '../services/bazarr.js';
 import * as docker from '../services/docker.js';
@@ -34,12 +35,18 @@ async function buildIndexers() {
 
 async function buildHealthWarnings() {
   const tag = (arr, service) => (arr || []).map((w) => ({ service, ...w }));
-  const [s, r, p] = await Promise.all([
+  const [s, r, l, p] = await Promise.all([
     settle(sonarr.health, []),
     settle(radarr.health, []),
+    settle(lidarr.health, []),
     settle(prowlarr.health, [])
   ]);
-  return [...tag(s.data, 'sonarr'), ...tag(r.data, 'radarr'), ...tag(p.data, 'prowlarr')];
+  return [
+    ...tag(s.data, 'sonarr'),
+    ...tag(r.data, 'radarr'),
+    ...tag(l.data, 'lidarr'),
+    ...tag(p.data, 'prowlarr')
+  ];
 }
 
 // GET /api/diagnostics

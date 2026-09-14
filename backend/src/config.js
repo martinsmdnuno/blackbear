@@ -19,6 +19,11 @@ function defaultConfig() {
         apiKey: process.env.RADARR_API_KEY || '',
         container: process.env.RADARR_CONTAINER || 'radarr'
       },
+      lidarr: {
+        url: process.env.LIDARR_URL || 'http://lidarr:8686',
+        apiKey: process.env.LIDARR_API_KEY || '',
+        container: process.env.LIDARR_CONTAINER || 'lidarr'
+      },
       prowlarr: {
         url: process.env.PROWLARR_URL || 'http://prowlarr:9696',
         apiKey: process.env.PROWLARR_API_KEY || '',

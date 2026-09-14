@@ -50,6 +50,14 @@ committed work — just a menu. Rough effort tags: **(S)** small, **(M)** medium
 - **Soft-delete / "trash"** — move to a holding state for N days before real disk deletion (a
   safety net beyond the confirm dialog). **(M)**
 
+## Música (Lidarr)
+
+- **Módulo de música** — Lidarr montado e ligado ao Blackbear (Fase 1 feita); falta a
+  biblioteca de música, o fluxo de adicionar e os extras. Plano e estado em
+  [docs/MUSIC.md](MUSIC.md). **(M)**
+- **Soulseek (slskd)** — fonte complementar para música de catálogo, onde os trackers
+  públicos têm swarms mortos. Via plugin do Lidarr ou Soularr. **(M)**
+
 ## Jellyfin
 
 - **Continue watching / recently added** surfaced in Blackbear. **(M)**
