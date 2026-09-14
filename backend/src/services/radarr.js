@@ -13,8 +13,15 @@ export const addMovie = (payload) => client.post('/movie', payload);
 
 export const allMovies = () => client.get('/movie');
 
-export const deleteMovie = (id, deleteFiles) =>
-  client.del(`/movie/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}&addImportExclusion=false`);
+export const movie = (id) => client.get(`/movie/${id}`);
+
+// Deleting a big movie off the USB disk can outlast the default 12s timeout —
+// and a timeout there would report a failure for a delete that went through.
+export const deleteMovie = (id, deleteFiles, addExclusion = false) =>
+  client.del(
+    `/movie/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}&addImportExclusion=${addExclusion ? 'true' : 'false'}`,
+    { timeout: 60000 }
+  );
 
 export const queue = () => client.get('/queue?pageSize=100');
 
@@ -22,6 +29,10 @@ export const queue = () => client.get('/queue?pageSize=100');
 // to map a seeded torrent back to the movie it was imported as.
 export const historyForDownload = (downloadId) =>
   client.get(`/history?page=1&pageSize=50&downloadId=${encodeURIComponent(downloadId)}`);
+
+// Every downloadFolderImported (eventType 3) record — its downloadId is the
+// torrent hash, which is how the Library ties a movie to its torrent(s).
+export const importHistory = () => client.allPages('/history?eventType=3');
 
 // Remove a queue item, blocklisting the release so Radarr grabs a different one.
 export const removeQueueItem = (id) =>

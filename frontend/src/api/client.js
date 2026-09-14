@@ -1,14 +1,24 @@
 const BASE = '/api';
 
 async function req(path, options = {}) {
+  // Optional client-side timeout, so a stuck backend can't hang the UI forever.
+  const { timeout, ...fetchOptions } = options;
+  const controller = timeout ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeout) : null;
   let res;
   try {
     res = await fetch(`${BASE}${path}`, {
       headers: { 'Content-Type': 'application/json' },
-      ...options
+      ...fetchOptions,
+      signal: controller?.signal
     });
   } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`BlackBeard backend didn't answer within ${Math.round(timeout / 1000)}s`);
+    }
     throw new Error('Cannot reach BlackBeard backend');
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
@@ -57,7 +67,16 @@ export const api = {
   portugasSetup: () => req('/portugas/setup', { method: 'POST' }),
   grabLink: (url) => req('/portugas/grab', { method: 'POST', body: JSON.stringify({ url }) }),
 
+  library: () => req('/library', { timeout: 60000 }),
   libraryIds: () => req('/library/ids'),
+  // A real delete runs qBittorrent + Radarr/Sonarr calls back to back (up to 60s
+  // for a big series folder), so allow well beyond the backend's own timeouts.
+  libraryDelete: (type, id, options) =>
+    req(`/library/${type}/${id}/delete`, {
+      method: 'POST',
+      body: JSON.stringify(options),
+      timeout: 150000
+    }),
 
   seeding: () => req('/seeding'),
   seedingDelete: (hashes) =>

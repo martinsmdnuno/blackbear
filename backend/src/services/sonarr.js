@@ -13,8 +13,21 @@ export const addSeries = (payload) => client.post('/series', payload);
 
 export const allSeries = () => client.get('/series');
 
-export const deleteSeries = (id, deleteFiles) =>
-  client.del(`/series/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`);
+export const series = (id) => client.get(`/series/${id}`);
+
+// A whole series folder can take a while to remove from the USB disk, so give it
+// more than the default 12s rather than report a delete that went through as failed.
+export const deleteSeries = (id, deleteFiles, addExclusion = false) =>
+  client.del(
+    `/series/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}&addImportListExclusion=${addExclusion ? 'true' : 'false'}`,
+    { timeout: 60000 }
+  );
+
+export const episodeFiles = (seriesId) => client.get(`/episodefile?seriesId=${seriesId}`);
+
+// Every downloadFolderImported (eventType 3) record — its downloadId is the
+// torrent hash, which is how the Library ties a series to its torrent(s).
+export const importHistory = () => client.allPages('/history?eventType=3');
 
 // Map a torrent hash back to the episodes it was imported as.
 export const historyForDownload = (downloadId) =>

@@ -6,6 +6,9 @@ build/
 config.json
 config/
 
+# Library deletion audit log (runtime data).
+logs/
+
 *.log
 npm-debug.log*
 .DS_Store

@@ -59,6 +59,12 @@ function defaultConfig() {
         reGrabStalled: false, // re-grab stalled torrents via Sonarr/Radarr (blocklist + re-search)
         stalledMinutes: 60, // a torrent stalled for at least this long is considered stuck
         intervalSeconds: 120
+      },
+      library: {
+        // Tracker hostnames treated as private when qBittorrent can't say itself
+        // (no `private` field / `is_private` property). Also read live from
+        // PRIVATE_TRACKERS — see privateTrackerHosts().
+        privateTrackers: []
       }
     }
   };
@@ -107,6 +113,18 @@ export function getService(name) {
 
 export function getAppConfig() {
   return getConfig().app || {};
+}
+
+// PRIVATE_TRACKERS=host1.tld,host2.tld (env) ∪ app.library.privateTrackers
+// (config.json). The env list is read on every call rather than seeded, so
+// editing .env and recreating the container always takes effect.
+export function privateTrackerHosts() {
+  const fromEnv = String(process.env.PRIVATE_TRACKERS || '').split(',');
+  const fromConfig = getAppConfig().library?.privateTrackers || [];
+  const hosts = [...fromEnv, ...fromConfig]
+    .map((h) => String(h || '').trim().toLowerCase())
+    .filter(Boolean);
+  return [...new Set(hosts)];
 }
 
 function persist() {

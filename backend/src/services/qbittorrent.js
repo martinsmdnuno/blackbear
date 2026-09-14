@@ -127,4 +127,7 @@ export const remove = (hashes, deleteFiles = false) =>
 
 export const trackers = (hash) => callJson(`/api/v2/torrents/trackers?hash=${hash}`);
 
-export default { version, listTorrents, pause, resume, remove, trackers };
+// Generic torrent properties; carries `is_private` on qBittorrent 4.5+.
+export const properties = (hash) => callJson(`/api/v2/torrents/properties?hash=${hash}`);
+
+export default { version, listTorrents, pause, resume, remove, trackers, properties };
