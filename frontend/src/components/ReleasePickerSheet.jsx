@@ -12,6 +12,7 @@ import { bytes, truncate } from '../lib/format.js';
 // target: { type: 'movie', service: 'radarr', id, label }
 //       | { type: 'episode', service: 'sonarr', id, label }
 //       | { type: 'season', service: 'sonarr', seriesId, seasonNumber, label }
+//       | { type: 'album', service: 'lidarr', id, label }
 
 function ageLabel(days) {
   if (days == null) return '—';
@@ -102,7 +103,9 @@ export default function ReleasePickerSheet({ target, onClose }) {
             ? await api.movieReleases(target.id)
             : target.type === 'episode'
               ? await api.episodeReleases(target.id)
-              : await api.seasonReleases(target.seriesId, target.seasonNumber);
+              : target.type === 'album'
+                ? await api.albumReleases(target.id)
+                : await api.seasonReleases(target.seriesId, target.seasonNumber);
         if (!cancelled) setReleases(res);
       } catch (err) {
         if (!cancelled) setError(err.message);

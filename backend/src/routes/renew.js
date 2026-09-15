@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import * as sonarr from '../services/sonarr.js';
 import * as radarr from '../services/radarr.js';
+import * as lidarr from '../services/lidarr.js';
 import * as qbit from '../services/qbittorrent.js';
 
 const router = Router();
+
+const ARR = { sonarr, radarr, lidarr };
 
 // POST /api/renew/episode/:id — search indexers for one missing episode.
 router.post('/episode/:id', async (req, res) => {
@@ -40,6 +43,16 @@ router.post('/movie/:id', async (req, res) => {
   }
 });
 
+// POST /api/renew/album/:id — search indexers for one missing album.
+router.post('/album/:id', async (req, res) => {
+  try {
+    await lidarr.searchAlbums([Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // POST /api/renew/queue/:service/:id  body: { downloadId? }
 //
 // Force-renew a stuck download: remove the *arr queue item with blocklist=true
@@ -49,7 +62,7 @@ router.post('/movie/:id', async (req, res) => {
 // that and force-remove the torrent ourselves if the client got out of sync.
 router.post('/queue/:service/:id', async (req, res) => {
   const { service, id } = req.params;
-  const svc = service === 'sonarr' ? sonarr : service === 'radarr' ? radarr : null;
+  const svc = ARR[service];
   if (!svc) return res.status(400).json({ error: `Unknown service "${service}"` });
 
   try {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Loader2, Search as SearchIcon } from 'lucide-react';
 import { api } from '../api/client.js';
+import { artwork } from '../lib/format.js';
 import { useToast } from './Toast.jsx';
 
 const MIN_AVAILABILITY = [
@@ -17,6 +18,18 @@ const SERIES_MONITOR = [
   { value: 'firstSeason', label: 'First season' },
   { value: 'lastSeason', label: 'Last season' },
   { value: 'pilot', label: 'Pilot only' },
+  { value: 'none', label: 'None' }
+];
+
+// Lidarr's MonitorTypes. "All albums" is the honest default, but paired with a
+// restrictive metadata profile — that pair is what keeps a discography sane.
+const ARTIST_MONITOR = [
+  { value: 'all', label: 'All albums' },
+  { value: 'future', label: 'Future albums' },
+  { value: 'missing', label: 'Missing albums' },
+  { value: 'existing', label: 'Existing albums' },
+  { value: 'latest', label: 'Latest album' },
+  { value: 'first', label: 'First album' },
   { value: 'none', label: 'None' }
 ];
 
@@ -63,8 +76,11 @@ function Toggle({ checked, onChange, label }) {
 export default function AddSheet({ type, item, onClose, onAdded }) {
   const toast = useToast();
   const isMovie = type === 'movie';
+  const isArtist = type === 'artist';
+  const title = item.title || item.artistName;
 
   const [profiles, setProfiles] = useState([]);
+  const [metaProfiles, setMetaProfiles] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [metaError, setMetaError] = useState(null);
@@ -78,6 +94,7 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
     monitor: 'all',
     seasonFolder: true,
     seriesType: 'standard',
+    metadataProfileId: null,
     searchOnAdd: true,
     usePortugas: false
   });
@@ -88,14 +105,20 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
       setLoadingMeta(true);
       setMetaError(null);
       try {
-        const [p, f] = await Promise.all([api.qualityProfiles(type), api.rootFolders(type)]);
+        const [p, f, mp] = await Promise.all([
+          api.qualityProfiles(type),
+          api.rootFolders(type),
+          type === 'artist' ? api.metadataProfiles() : Promise.resolve([])
+        ]);
         if (cancelled) return;
         setProfiles(p);
         setFolders(f);
+        setMetaProfiles(mp);
         setOpts((o) => ({
           ...o,
           qualityProfileId: p[0]?.id ?? null,
-          rootFolderPath: f[0]?.path ?? ''
+          rootFolderPath: f[0]?.path ?? '',
+          metadataProfileId: mp[0]?.id ?? null
         }));
       } catch (err) {
         if (!cancelled) setMetaError(err.message);
@@ -116,7 +139,8 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
     setSubmitting(true);
     try {
       await api.add({ type, item, options: opts });
-      toast.success(`${item.title} added to ${isMovie ? 'Radarr' : 'Sonarr'}`);
+      const where = isMovie ? 'Radarr' : isArtist ? 'Lidarr' : 'Sonarr';
+      toast.success(`${title} added to ${where}`);
       onAdded?.(type, item);
       onClose();
     } catch (err) {
@@ -126,7 +150,7 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
     }
   }
 
-  const poster = item.images?.find((i) => i.coverType === 'poster')?.remoteUrl;
+  const poster = artwork(item.images);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center">
@@ -137,9 +161,11 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
             <img src={poster} alt="" className="h-24 w-16 shrink-0 rounded-lg object-cover" />
           )}
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-lg font-bold text-parchment">{item.title}</h3>
-            <p className="text-sm text-silver">
-              {item.year || '—'} · {isMovie ? 'Movie' : 'Series'}
+            <h3 className="truncate text-lg font-bold text-parchment">{title}</h3>
+            <p className="truncate text-sm text-silver">
+              {isArtist
+                ? [item.disambiguation, item.artistType].filter(Boolean).join(' · ') || 'Artist'
+                : `${item.year || '—'} · ${isMovie ? 'Movie' : 'Series'}`}
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-silver hover:text-parchment">
@@ -187,7 +213,44 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
               </Field>
             )}
 
-            {isMovie ? (
+            {isArtist && (
+              <>
+                <Field label="Metadata Profile">
+                  <select
+                    className="input"
+                    value={opts.metadataProfileId ?? ''}
+                    onChange={(e) =>
+                      setOpts({ ...opts, metadataProfileId: Number(e.target.value) })
+                    }
+                  >
+                    {metaProfiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-xs text-silver">
+                    What counts as part of the discography. A permissive one drags in every
+                    single, live bootleg and remix compilation the artist ever touched.
+                  </span>
+                </Field>
+                <Field label="Monitor">
+                  <select
+                    className="input"
+                    value={opts.monitor}
+                    onChange={(e) => setOpts({ ...opts, monitor: e.target.value })}
+                  >
+                    {ARTIST_MONITOR.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </>
+            )}
+
+            {isArtist ? null : isMovie ? (
               <>
                 <Field label="Minimum Availability">
                   <select
@@ -252,13 +315,14 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
 
             <div className="space-y-1">
               <Toggle
-                label="Usar Portugas (desenhos animados)"
+                label={`Usar Portugas${isArtist ? ' (música PT)' : ' (desenhos animados)'}`}
                 checked={opts.usePortugas}
                 onChange={(v) => setOpts({ ...opts, usePortugas: v })}
               />
               <p className="px-1 text-[11px] leading-snug text-silver">
                 Por defeito o Portugas é evitado (protecção Hit&nbsp;&amp;&nbsp;Run). Liga apenas
-                para conteúdo que queres mesmo ir buscar lá — tipicamente desenhos animados.
+                para conteúdo que queres mesmo ir buscar lá — tipicamente{' '}
+                {isArtist ? 'música portuguesa' : 'desenhos animados'}.
               </p>
             </div>
 
@@ -268,7 +332,7 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
               ) : (
                 <SearchIcon size={18} />
               )}
-              Add to {isMovie ? 'Radarr' : 'Sonarr'}
+              Add to {isMovie ? 'Radarr' : isArtist ? 'Lidarr' : 'Sonarr'}
             </button>
           </div>
         )}

@@ -57,10 +57,11 @@ FLAC 16/44. Demorou ~7 h por causa do swarm morto, não da configuração.
       Diagnostics, card em Settings, fila do Lidarr em `/api/downloads`.
 - [x] **Fase 2 — biblioteca de música.** Álbuns na Library com associação ao torrent,
       apagamento em cascata e as mesmas guardas (Portugas, HnR, hardlinks).
-- [ ] **Fase 3 — adicionar música.** Procura de artista/álbum com o *metadata profile*
-      exposto na UI (é o que trava a enxurrada de singles e bootlegs).
-- [ ] **Fase 4 — extras.** Wanted/missing, calendário de lançamentos, refresh da
-      biblioteca de música no Jellyfin.
+- [x] **Fase 3 — adicionar música.** Modo "Music" na procura, com o *metadata profile*
+      exposto no painel de adicionar.
+- [x] **Fase 4 — extras.** Secção "Albums" no Upcoming (em falta + a caminho), com
+      Search / Renew / Pick. O refresh do Jellyfin já era coberto: o `/Library/Refresh`
+      que o apagamento dispara varre todas as bibliotecas, música incluída.
 
 ### O que a Fase 2 revelou
 
@@ -80,6 +81,20 @@ FLAC 16/44. Demorou ~7 h por causa do swarm morto, não da configuração.
 3. **`/trackfile` recusa pedidos sem filtro** (`artistId`, `albumId`, `trackFileIds` ou
    `unmapped`). A varredura da Library pergunta uma vez por artista com ficheiros — bem
    menos chamadas do que uma por álbum.
+
+### O que as Fases 3 e 4 revelaram
+
+1. **`wanted/missing` ignora álbuns cujo artista não está monitorizado.** Podes monitorizar
+   um álbum e ele não aparece em lado nenhum, porque o Lidarr filtra primeiro pelo
+   artista. Confirmado empiricamente: com o artista a `false`, `totalRecords: 0`; a
+   `true`, o mesmo álbum aparece.
+2. **O Lidarr devolve caminhos locais para arte de itens já na biblioteca**
+   (`/config/MediaCover/1/poster.jpg` em vez de um URL). O browser tentava carregá-los da
+   própria app e mostrava uma imagem partida. Agora só URLs absolutos contam, e o resto
+   cai no ícone — em `lib/format.js` (`artwork`), `services/library.js` e `pipeline.js`.
+3. **Um `npm run build` que passa não prova nada sobre identificadores em falta.** Um
+   `import` esquecido (`Disc3`) compilou sem queixa e rebentou como `ReferenceError` só
+   ao abrir a página. Foi apanhado no browser, não no build.
 
 ### Ainda por resolver
 

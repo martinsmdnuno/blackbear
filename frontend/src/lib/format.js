@@ -80,3 +80,15 @@ export function duration(seconds) {
   const rest = hours % 24;
   return days < 10 && rest ? `${days}d ${rest}h` : `${days}d`;
 }
+
+// Artwork URL from an *arr images array. Lidarr returns a local
+// /config/MediaCover path for anything already in its library, which the
+// browser would resolve against our own origin and fail to load — so only an
+// absolute URL counts, and callers fall back to an icon.
+export function artwork(images) {
+  return (
+    (images || [])
+      .map((i) => (i.coverType === 'poster' || i.coverType === 'cover' ? i.remoteUrl : null))
+      .find((u) => typeof u === 'string' && /^https?:\/\//i.test(u)) || null
+  );
+}

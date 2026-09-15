@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as radarr from '../services/radarr.js';
 import * as sonarr from '../services/sonarr.js';
+import * as lidarr from '../services/lidarr.js';
 import * as qbit from '../services/qbittorrent.js';
 
 const router = Router();
@@ -13,8 +14,15 @@ async function settle(fn, fallback) {
   }
 }
 
+// Radarr/Sonarr call it a poster; Lidarr calls an album's artwork a cover — and
+// for items already in its library it returns a local /config/MediaCover path
+// rather than a remote URL, which is useless to the browser. Absolute only.
 function poster(item) {
-  return item.images?.find((i) => i.coverType === 'poster')?.remoteUrl || null;
+  return (
+    item.images
+      ?.map((i) => (i.coverType === 'poster' || i.coverType === 'cover' ? i.remoteUrl : null))
+      .find((u) => typeof u === 'string' && /^https?:\/\//i.test(u)) || null
+  );
 }
 
 // Pick the soonest *future* release date for an upcoming movie; for a missing
@@ -71,7 +79,7 @@ function queueInfo(record, torrentStates) {
 
 // GET /api/pipeline?movieDays=365&episodeDays=90
 //
-// Returns two arrays — movies and episodes — each combining:
+// Returns three arrays — movies, episodes and albums — each combining:
 //   - missing items (already released / aired but not yet downloaded), first
 //   - upcoming items (future releases / airings), sorted by date asc
 router.get('/', async (req, res) => {
@@ -82,16 +90,29 @@ router.get('/', async (req, res) => {
   const movieEnd = new Date(now + movieDays * 86400000).toISOString();
   const episodeEnd = new Date(now + episodeDays * 86400000).toISOString();
 
-  const [calMovies, calEpisodes, allMovies, missingEps, sonarrQ, radarrQ, torrents] =
-    await Promise.all([
-      settle(() => radarr.calendar(start, movieEnd), []),
-      settle(() => sonarr.calendar(start, episodeEnd), []),
-      settle(radarr.allMovies, []),
-      settle(sonarr.missing, { records: [] }),
-      settle(sonarr.queue, { records: [] }),
-      settle(radarr.queue, { records: [] }),
-      settle(qbit.listTorrents, [])
-    ]);
+  const [
+    calMovies,
+    calEpisodes,
+    calAlbums,
+    allMovies,
+    missingEps,
+    missingAlbums,
+    sonarrQ,
+    radarrQ,
+    lidarrQ,
+    torrents
+  ] = await Promise.all([
+    settle(() => radarr.calendar(start, movieEnd), []),
+    settle(() => sonarr.calendar(start, episodeEnd), []),
+    settle(() => lidarr.calendar(start, movieEnd), []),
+    settle(radarr.allMovies, []),
+    settle(sonarr.missing, { records: [] }),
+    settle(lidarr.missing, { records: [] }),
+    settle(sonarr.queue, { records: [] }),
+    settle(radarr.queue, { records: [] }),
+    settle(lidarr.queue, { records: [] }),
+    settle(qbit.listTorrents, [])
+  ]);
 
   // hash -> qBittorrent state, to spot stalled downloads behind queue items.
   const torrentStates = new Map(
@@ -104,6 +125,10 @@ router.get('/', async (req, res) => {
   const movieQueue = new Map();
   for (const r of radarrQ.data?.records || []) {
     if (r.movieId != null) movieQueue.set(r.movieId, r);
+  }
+  const albumQueue = new Map();
+  for (const r of lidarrQ.data?.records || []) {
+    if (r.albumId != null) albumQueue.set(r.albumId, r);
   }
 
   // Upcoming movies (calendar, future).
@@ -187,6 +212,33 @@ router.get('/', async (req, res) => {
       queue: queueInfo(episodeQueue.get(e.id), torrentStates)
     }));
 
+  // An album is released on a single date, so it needs none of the movie's
+  // digital/physical/cinema juggling: the calendar carries what is still coming,
+  // and wanted/missing what is out but not on disk.
+  const albumRow = (a, missing) => ({
+    id: a.id,
+    artistId: a.artistId,
+    artist: a.artist?.artistName || 'Unknown artist',
+    title: a.title,
+    poster: poster(a) || (a.artist ? poster(a.artist) : null),
+    albumType: a.albumType || null,
+    monitored: a.monitored,
+    date: a.releaseDate,
+    missing,
+    ...(missing ? { queue: queueInfo(albumQueue.get(a.id), torrentStates) } : {})
+  });
+
+  const upcomingAlbums = (calAlbums.data || [])
+    .filter((a) => a.releaseDate && new Date(a.releaseDate).getTime() > now)
+    .map((a) => albumRow(a, false))
+    .sort((x, y) => new Date(x.date) - new Date(y.date));
+
+  const upcomingAlbumIds = new Set(upcomingAlbums.map((a) => a.id));
+  const missingAlbumRows = (missingAlbums.data?.records || [])
+    .filter((a) => a.releaseDate && !upcomingAlbumIds.has(a.id))
+    .map((a) => albumRow(a, true))
+    .sort((x, y) => new Date(y.date) - new Date(x.date));
+
   res.json({
     movies: {
       items: [...missingMovies, ...upcomingMovies],
@@ -199,6 +251,12 @@ router.get('/', async (req, res) => {
       missingCount: missingEpisodes.length,
       upcomingCount: upcomingEpisodes.length,
       error: calEpisodes.error || missingEps.error || null
+    },
+    albums: {
+      items: [...missingAlbumRows, ...upcomingAlbums],
+      missingCount: missingAlbumRows.length,
+      upcomingCount: upcomingAlbums.length,
+      error: calAlbums.error || missingAlbums.error || null
     }
   });
 });

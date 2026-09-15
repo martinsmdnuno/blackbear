@@ -32,6 +32,9 @@ export const api = {
   personCredits: (id) => req(`/search/person/${id}`),
   qualityProfiles: (type) => req(`/add/quality-profiles?type=${type}`),
   rootFolders: (type) => req(`/add/root-folders?type=${type}`),
+  // Lidarr only: decides whether an artist brings in albums, or albums plus
+  // every single, live bootleg and remix compilation.
+  metadataProfiles: () => req('/add/metadata-profiles'),
   add: (payload) => req('/add', { method: 'POST', body: JSON.stringify(payload) }),
 
   pipeline: () => req('/pipeline'),
@@ -42,6 +45,7 @@ export const api = {
   renewSeason: (seriesId, seasonNumber) =>
     req('/renew/season', { method: 'POST', body: JSON.stringify({ seriesId, seasonNumber }) }),
   renewMovie: (id) => req(`/renew/movie/${id}`, { method: 'POST' }),
+  renewAlbum: (id) => req(`/renew/album/${id}`, { method: 'POST' }),
   renewQueue: (service, id, downloadId) =>
     req(`/renew/queue/${service}/${id}`, {
       method: 'POST',
@@ -49,6 +53,7 @@ export const api = {
     }),
 
   movieReleases: (id) => req(`/releases/movie/${id}`),
+  albumReleases: (id) => req(`/releases/album/${id}`),
   episodeReleases: (id) => req(`/releases/episode/${id}`),
   seasonReleases: (seriesId, seasonNumber) =>
     req(`/releases/season?seriesId=${seriesId}&seasonNumber=${seasonNumber}`),
