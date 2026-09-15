@@ -1,5 +1,6 @@
 import * as sonarr from './sonarr.js';
 import * as radarr from './radarr.js';
+import * as lidarr from './lidarr.js';
 import * as prowlarr from './prowlarr.js';
 import * as bazarr from './bazarr.js';
 import * as qbit from './qbittorrent.js';
@@ -16,6 +17,10 @@ const probes = {
   },
   radarr: async () => {
     const s = await radarr.systemStatus();
+    return s?.version;
+  },
+  lidarr: async () => {
+    const s = await lidarr.systemStatus();
     return s?.version;
   },
   prowlarr: async () => {

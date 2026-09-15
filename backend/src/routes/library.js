@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { stat } from 'node:fs/promises';
 import * as radarr from '../services/radarr.js';
 import * as sonarr from '../services/sonarr.js';
+import * as lidarr from '../services/lidarr.js';
 import * as qbit from '../services/qbittorrent.js';
 import * as jellyfin from '../services/jellyfin.js';
 import { invalidate } from '../services/recommend.js';
@@ -19,6 +20,7 @@ import {
   mapLimit,
   matchTorrents,
   normalizeHash,
+  normalizeAlbum,
   normalizeMovie,
   normalizeSeries,
   parseDeleteOptions,
@@ -69,6 +71,50 @@ function withLinks(files) {
   });
 }
 
+// Albums with files, each paired with its track files. Lidarr won't serve an
+// unfiltered /trackfile, so the sweep asks once per artist that actually has
+// files — far fewer calls than one per album — and buckets the result by
+// albumId. A single-album load (the delete path) asks for that album directly.
+async function loadAlbums(albums, only) {
+  const withFiles = albums.filter((a) => (a?.statistics?.trackFileCount || 0) > 0);
+  if (!withFiles.length) return [];
+
+  if (only) {
+    const a = withFiles[0];
+    try {
+      return [normalizeAlbum(a, (await lidarr.trackFilesByAlbum(a.id)) || [])];
+    } catch {
+      // Track list unavailable: one pathless placeholder keeps the size and
+      // makes the hardlink state "unknown" instead of a false "not linked".
+      const item = normalizeAlbum(a, []);
+      item.files = [{ path: null, size: item.sizeOnDisk }];
+      return [item];
+    }
+  }
+
+  const artistIds = [...new Set(withFiles.map((a) => a.artistId).filter(Boolean))];
+  const byAlbum = new Map();
+  const failedArtists = new Set();
+  await mapLimit(artistIds, 4, async (artistId) => {
+    try {
+      for (const f of (await lidarr.trackFilesByArtist(artistId)) || []) {
+        if (!byAlbum.has(f.albumId)) byAlbum.set(f.albumId, []);
+        byAlbum.get(f.albumId).push(f);
+      }
+    } catch {
+      failedArtists.add(artistId);
+    }
+  });
+
+  return withFiles.map((a) => {
+    const item = normalizeAlbum(a, byAlbum.get(a.id) || []);
+    if (!item.files.length && failedArtists.has(a.artistId)) {
+      item.files = [{ path: null, size: item.sizeOnDisk }];
+    }
+    return item;
+  });
+}
+
 // Everything the Library needs, in one pass: items with files on disk, their
 // hardlink counts, and the torrents the import history ties them to. `only`
 // ({ type, id }) narrows it to a single item for the delete path — the import
@@ -76,19 +122,25 @@ function withLinks(files) {
 async function loadLibrary(only = null) {
   const wantMovies = !only || only.type === 'movie';
   const wantSeries = !only || only.type === 'series';
+  const wantAlbums = !only || only.type === 'album';
 
-  const [movies, series, movieImports, seriesImports, torrents, busy] = await Promise.all([
-    wantMovies
-      ? settle(() => (only ? radarr.movie(only.id).then((m) => [m]) : radarr.allMovies()), [])
-      : NONE,
-    wantSeries
-      ? settle(() => (only ? sonarr.series(only.id).then((s) => [s]) : sonarr.allSeries()), [])
-      : NONE,
-    wantMovies ? settle(radarr.importHistory, []) : NONE,
-    wantSeries ? settle(sonarr.importHistory, []) : NONE,
-    settle(qbit.listTorrents, null),
-    busyHashes().catch(() => new Set())
-  ]);
+  const [movies, series, albums, movieImports, seriesImports, albumImports, torrents, busy] =
+    await Promise.all([
+      wantMovies
+        ? settle(() => (only ? radarr.movie(only.id).then((m) => [m]) : radarr.allMovies()), [])
+        : NONE,
+      wantSeries
+        ? settle(() => (only ? sonarr.series(only.id).then((s) => [s]) : sonarr.allSeries()), [])
+        : NONE,
+      wantAlbums
+        ? settle(() => (only ? lidarr.album(only.id).then((a) => [a]) : lidarr.allAlbums()), [])
+        : NONE,
+      wantMovies ? settle(radarr.importHistory, []) : NONE,
+      wantSeries ? settle(sonarr.importHistory, []) : NONE,
+      wantAlbums ? settle(lidarr.importHistory, []) : NONE,
+      settle(qbit.listTorrents, null),
+      busyHashes().catch(() => new Set())
+    ]);
 
   const movieItems = (movies.data || []).filter((m) => m?.hasFile).map(normalizeMovie);
   const seriesItems = await mapLimit(
@@ -106,16 +158,18 @@ async function loadLibrary(only = null) {
       }
     }
   );
-  const items = [...movieItems, ...seriesItems];
+  const albumItems = await loadAlbums(albums.data || [], only);
+  const items = [...movieItems, ...seriesItems, ...albumItems];
   await mapLimit(items, 4, async (item) => {
     item.files = await withLinks(item.files);
   });
 
   const imports = {
     movie: { index: indexImports(movieImports.data, 'movieId'), error: movieImports.error },
-    series: { index: indexImports(seriesImports.data, 'seriesId'), error: seriesImports.error }
+    series: { index: indexImports(seriesImports.data, 'seriesId'), error: seriesImports.error },
+    album: { index: indexImports(albumImports.data, 'albumId'), error: albumImports.error }
   };
-  const owners = hashOwners([imports.movie.index, imports.series.index]);
+  const owners = hashOwners([imports.movie.index, imports.series.index, imports.album.index]);
   const byHash = torrents.data ? torrentIndex(torrents.data) : null;
   const privateHosts = privateTrackerHosts();
   const nowSec = Date.now() / 1000;
@@ -143,6 +197,7 @@ async function loadLibrary(only = null) {
     errors: {
       radarr: movies.error || movieImports.error || null,
       sonarr: series.error || seriesImports.error || null,
+      lidarr: albums.error || albumImports.error || null,
       qbittorrent: torrents.error || null
     }
   };
@@ -151,7 +206,8 @@ async function loadLibrary(only = null) {
 // The item as the frontend sees it: file paths stay server-side, hardlink and
 // torrent facts are rolled up.
 function publicItem(item) {
-  const { files, ...rest } = item;
+  // trackFileIds are internal handles for the delete path, like file paths.
+  const { files, trackFileIds, ...rest } = item;
   const links = linkStats(files);
   return {
     ...rest,
@@ -195,6 +251,22 @@ router.get('/ids', async (_req, res) => {
   });
 });
 
+// Deleting music is not the same shape as deleting a movie. An album record is
+// metadata hanging off an artist — Lidarr re-creates it on the next refresh —
+// so removing the record would be theatre. What we remove are the track files,
+// and we unmonitor first or Lidarr grabs the album straight back (same reason
+// Sonarr's delete unmonitors before removing episodes). The artist stays, with
+// the rest of its discography untouched.
+async function deleteAlbum(item, step) {
+  await lidarr.setAlbumsMonitored([item.id], false);
+  if (!step.deleteFiles) return;
+  const ids = item.trackFileIds || [];
+  if (!ids.length) {
+    throw new Error('Lidarr lists no track files for this album — nothing to delete.');
+  }
+  await lidarr.deleteTrackFiles(ids);
+}
+
 // POST /api/library/:type/:id/delete
 //   { deleteFiles, deleteTorrent, addExclusion, dryRun, confirmTitle }
 // Everything is re-resolved from the services on every call — the client's view
@@ -203,8 +275,8 @@ router.get('/ids', async (_req, res) => {
 router.post('/:type/:id/delete', async (req, res) => {
   const { type } = req.params;
   const id = Number(req.params.id);
-  if (!['movie', 'series'].includes(type) || !Number.isInteger(id) || id <= 0) {
-    return res.status(400).json({ error: 'Expected /api/library/movie|series/:id/delete' });
+  if (!['movie', 'series', 'album'].includes(type) || !Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Expected /api/library/movie|series|album/:id/delete' });
   }
   const opts = parseDeleteOptions(req.body);
 
@@ -216,7 +288,7 @@ router.post('/:type/:id/delete', async (req, res) => {
   }
   const item = loaded.items[0];
   if (!item) {
-    const err = loaded.errors[type === 'movie' ? 'radarr' : 'sonarr'];
+    const err = loaded.errors[{ movie: 'radarr', series: 'sonarr', album: 'lidarr' }[type]];
     if (err && !/\b404\b/.test(err)) return res.status(502).json({ error: err });
     return res.status(404).json({ error: `No ${type} ${id} with files on disk` });
   }
@@ -237,10 +309,11 @@ router.post('/:type/:id/delete', async (req, res) => {
 
   const result = await executePlan(plan, {
     removeTorrent: (hash) => qbit.remove(hash, true),
-    deleteItem: (step) =>
-      type === 'movie'
-        ? radarr.deleteMovie(step.id, step.deleteFiles, step.addExclusion)
-        : sonarr.deleteSeries(step.id, step.deleteFiles, step.addExclusion)
+    deleteItem: (step) => {
+      if (type === 'movie') return radarr.deleteMovie(step.id, step.deleteFiles, step.addExclusion);
+      if (type === 'series') return sonarr.deleteSeries(step.id, step.deleteFiles, step.addExclusion);
+      return deleteAlbum(item, step);
+    }
   });
 
   // What actually came back, given which steps went through.
