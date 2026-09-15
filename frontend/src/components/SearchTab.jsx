@@ -98,6 +98,47 @@ function ResultCard({ item, mode, owned, onAdd }) {
   );
 }
 
+function AlbumCard({ album, onAdd }) {
+  const cover = artwork(album.images);
+  const artist = album.artist?.artistName;
+  const year = album.releaseDate ? String(album.releaseDate).slice(0, 4) : null;
+  const flavour = [album.albumType, ...(album.secondaryTypes || [])].filter(Boolean).join(' · ');
+  return (
+    <button
+      onClick={onAdd}
+      className="card flex w-full gap-3 p-3 text-left transition hover:border-gold/40"
+    >
+      <div className="h-[74px] w-[74px] shrink-0 overflow-hidden rounded-md bg-night-800">
+        {cover ? (
+          <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full items-center justify-center text-silver/70">
+            <Disc3 size={24} />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <h3 className="flex-1 font-semibold leading-tight text-parchment">{album.title}</h3>
+          <span className="shrink-0 rounded-md bg-gold/15 px-1.5 py-0.5 text-gold">
+            <Plus size={16} />
+          </span>
+        </div>
+        <p className="truncate text-sm text-gold-light">{artist}</p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-silver">
+          {year && <span>{year}</span>}
+          {flavour && <span>{flavour}</span>}
+          {album.ratings?.votes > 0 && (
+            <span className="flex items-center gap-0.5 text-gold-light">
+              <Star size={10} className="fill-gold-light" /> {album.ratings.value}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function PersonCard({ person, onOpen }) {
   return (
     <button
@@ -257,6 +298,9 @@ export default function SearchTab() {
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [lookingUp, setLookingUp] = useState(null);
   const [selected, setSelected] = useState(null);
+  // Dentro de Music: procurar o artista inteiro ou um álbum só.
+  const [musicKind, setMusicKind] = useState('album');
+  const [albumHint, setAlbumHint] = useState(null);
   const [ownedIds, setOwnedIds] = useState({
     movie: new Set(),
     series: new Set(),
@@ -286,7 +330,9 @@ export default function SearchTab() {
     const owned =
       type === 'artist'
         ? { key: 'artist', id: item.foreignArtistId }
-        : { key: type === 'movie' ? 'movie' : 'series', id: item.tmdbId };
+        : type === 'album'
+          ? { key: 'artist', id: item.artist?.foreignArtistId }
+          : { key: type === 'movie' ? 'movie' : 'series', id: item.tmdbId };
     if (owned.id) {
       setOwnedIds((o) => ({ ...o, [owned.key]: new Set(o[owned.key]).add(owned.id) }));
     }
@@ -296,14 +342,23 @@ export default function SearchTab() {
     if (!q.trim()) {
       setResults([]);
       setSearched(false);
+      setAlbumHint(null);
       return;
     }
     setLoading(true);
     setError(null);
+    setAlbumHint(null);
     const request = m === 'person' ? api.searchPerson(q) : api.search(m, q);
     request
       .then((res) => {
-        setResults(res || []);
+        // Album search answers with { items, artist, artistOnly }; the rest
+        // with a plain array.
+        if (m === 'album' && res && !Array.isArray(res)) {
+          setResults(res.items || []);
+          setAlbumHint(res.artistOnly ? res.artist : null);
+        } else {
+          setResults(res || []);
+        }
         setSearched(true);
       })
       .catch((err) => {
@@ -313,11 +368,14 @@ export default function SearchTab() {
       .finally(() => setLoading(false));
   }
 
+  // Music splits in two: the tab picks the medium, this picks the unit.
+  const searchType = mode === 'artist' ? musicKind : mode;
+
   useEffect(() => {
     clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => runSearch(term, mode), 450);
+    debounce.current = setTimeout(() => runSearch(term, searchType), 450);
     return () => clearTimeout(debounce.current);
-  }, [term, mode]);
+  }, [term, searchType]);
 
   // Resolve a TMDb title (from a person's filmography) into a real Radarr/Sonarr
   // object, then open the Add sheet.
@@ -340,6 +398,7 @@ export default function SearchTab() {
     movie: 'movies',
     series: 'series',
     artist: 'artists',
+    album: 'albums — try "Pink Floyd Animals"',
     person: 'actors & directors'
   };
 
@@ -370,6 +429,29 @@ export default function SearchTab() {
         })}
       </div>
 
+      {/* Music splits in two: a whole artist, or one album. */}
+      {mode === 'artist' && (
+        <div className="flex gap-1.5 rounded-lg bg-night-850 p-1">
+          {[
+            { id: 'album', label: 'Album' },
+            { id: 'artist', label: 'Artist' }
+          ].map((k) => (
+            <button
+              key={k.id}
+              onClick={() => {
+                setMusicKind(k.id);
+                setResults([]);
+                setSearched(false);
+              }}
+              className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition
+                          ${musicKind === k.id ? 'bg-gold/20 text-gold' : 'text-silver'}`}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Search input */}
       <div className="relative">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-silver" />
@@ -377,7 +459,7 @@ export default function SearchTab() {
           autoFocus
           value={term}
           onChange={(e) => setTerm(e.target.value)}
-          placeholder={`Search ${placeholders[mode]}…`}
+          placeholder={`Search ${placeholders[searchType]}…`}
           className="input pl-10"
         />
         {loading && (
@@ -393,6 +475,27 @@ export default function SearchTab() {
               Person search uses TMDb — set a TMDb API key in Settings.
             </span>
           )}
+        </p>
+      )}
+
+      {/* Lidarr can't list a non-library artist's discography, so searching an
+          album by the band's name alone can only match album *titles*. Say so
+          and offer the mode that does what they meant. */}
+      {albumHint && (
+        <p className="rounded-lg border border-gold/25 bg-gold/10 px-3 py-2.5 text-xs text-parchment">
+          <span className="font-semibold">{albumHint.artistName}</span> is an artist, not an
+          album. Add an album title — or{' '}
+          <button
+            onClick={() => {
+              setMusicKind('artist');
+              setResults([]);
+              setSearched(false);
+            }}
+            className="font-semibold text-gold underline underline-offset-2"
+          >
+            search artists instead
+          </button>
+          .
         </p>
       )}
 
@@ -418,15 +521,23 @@ export default function SearchTab() {
           ? results.map((p) => (
               <PersonCard key={p.id} person={p} onOpen={() => setSelectedPerson(p)} />
             ))
-          : results.map((item) => (
-              <ResultCard
-                key={resultKey(item)}
-                item={item}
-                mode={mode}
-                owned={item.id > 0 || added.has(resultKey(item))}
-                onAdd={() => setSelected({ type: mode, item })}
-              />
-            ))}
+          : searchType === 'album'
+            ? results.map((item) => (
+                <AlbumCard
+                  key={item.foreignAlbumId}
+                  album={item}
+                  onAdd={() => setSelected({ type: 'album', item })}
+                />
+              ))
+            : results.map((item) => (
+                <ResultCard
+                  key={resultKey(item)}
+                  item={item}
+                  mode={searchType}
+                  owned={item.id > 0 || added.has(resultKey(item))}
+                  onAdd={() => setSelected({ type: searchType, item })}
+                />
+              ))}
       </div>
 
       {!searched && !loading && (

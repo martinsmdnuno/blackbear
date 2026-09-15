@@ -136,7 +136,18 @@ router.get('/root-folders', async (req, res) => {
   if (!svc) return res.status(400).json({ error: `type must be one of "${TYPES}"` });
   try {
     const folders = await svc.rootFolders();
-    res.json((folders || []).map((f) => ({ path: f.path, freeSpace: f.freeSpace })));
+    // Lidarr stores per-root-folder defaults (the FLAC profile, the metadata
+    // profile). Passing them on lets the add sheet start from what the server
+    // was actually configured for, instead of whatever sorts first — the
+    // difference between grabbing FLAC and grabbing MP3-192 by accident.
+    res.json(
+      (folders || []).map((f) => ({
+        path: f.path,
+        freeSpace: f.freeSpace,
+        defaultQualityProfileId: f.defaultQualityProfileId ?? null,
+        defaultMetadataProfileId: f.defaultMetadataProfileId ?? null
+      }))
+    );
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

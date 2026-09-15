@@ -77,6 +77,10 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
   const toast = useToast();
   const isMovie = type === 'movie';
   const isArtist = type === 'artist';
+  const isAlbum = type === 'album';
+  // Both music types need Lidarr's profile lists; an album also creates the
+  // artist behind it, so it asks for the same two profiles.
+  const isMusic = isArtist || isAlbum;
   const title = item.title || item.artistName;
 
   const [profiles, setProfiles] = useState([]);
@@ -105,20 +109,29 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
       setLoadingMeta(true);
       setMetaError(null);
       try {
+        const profileType = type === 'album' ? 'artist' : type;
         const [p, f, mp] = await Promise.all([
-          api.qualityProfiles(type),
-          api.rootFolders(type),
-          type === 'artist' ? api.metadataProfiles() : Promise.resolve([])
+          api.qualityProfiles(profileType),
+          api.rootFolders(profileType),
+          type === 'artist' || type === 'album' ? api.metadataProfiles() : Promise.resolve([])
         ]);
         if (cancelled) return;
         setProfiles(p);
         setFolders(f);
         setMetaProfiles(mp);
+        // Prefer the root folder's own defaults where the service has them
+        // (Lidarr does), so music starts on the FLAC profile rather than "Any".
+        const root = f[0];
+        const has = (id, list) => list.some((x) => x.id === id);
         setOpts((o) => ({
           ...o,
-          qualityProfileId: p[0]?.id ?? null,
-          rootFolderPath: f[0]?.path ?? '',
-          metadataProfileId: mp[0]?.id ?? null
+          qualityProfileId: has(root?.defaultQualityProfileId, p)
+            ? root.defaultQualityProfileId
+            : (p[0]?.id ?? null),
+          rootFolderPath: root?.path ?? '',
+          metadataProfileId: has(root?.defaultMetadataProfileId, mp)
+            ? root.defaultMetadataProfileId
+            : (mp[0]?.id ?? null)
         }));
       } catch (err) {
         if (!cancelled) setMetaError(err.message);
@@ -139,7 +152,7 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
     setSubmitting(true);
     try {
       await api.add({ type, item, options: opts });
-      const where = isMovie ? 'Radarr' : isArtist ? 'Lidarr' : 'Sonarr';
+      const where = isMovie ? 'Radarr' : isMusic ? 'Lidarr' : 'Sonarr';
       toast.success(`${title} added to ${where}`);
       onAdded?.(type, item);
       onClose();
@@ -163,9 +176,17 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-lg font-bold text-parchment">{title}</h3>
             <p className="truncate text-sm text-silver">
-              {isArtist
-                ? [item.disambiguation, item.artistType].filter(Boolean).join(' · ') || 'Artist'
-                : `${item.year || '—'} · ${isMovie ? 'Movie' : 'Series'}`}
+              {isAlbum
+                ? [
+                    item.artist?.artistName,
+                    item.releaseDate ? String(item.releaseDate).slice(0, 4) : null,
+                    item.albumType
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : isArtist
+                  ? [item.disambiguation, item.artistType].filter(Boolean).join(' · ') || 'Artist'
+                  : `${item.year || '—'} · ${isMovie ? 'Movie' : 'Series'}`}
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-silver hover:text-parchment">
@@ -213,7 +234,7 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
               </Field>
             )}
 
-            {isArtist && (
+            {isMusic && (
               <>
                 <Field label="Metadata Profile">
                   <select
@@ -230,10 +251,17 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
                     ))}
                   </select>
                   <span className="mt-1 block text-xs text-silver">
-                    What counts as part of the discography. A permissive one drags in every
-                    single, live bootleg and remix compilation the artist ever touched.
+                    {isAlbum
+                      ? 'Used for the artist this album hangs off. If it excludes the album — Standard drops compilations and live records — Lidarr never creates it.'
+                      : 'What counts as part of the discography. A permissive one drags in every single, live bootleg and remix compilation the artist ever touched.'}
                   </span>
                 </Field>
+                {isAlbum ? (
+                  <p className="rounded-lg bg-night-900 px-3 py-2.5 text-xs text-silver">
+                    Only this album is monitored. The artist is added alongside it — the rest of
+                    the discography stays untouched.
+                  </p>
+                ) : (
                 <Field label="Monitor">
                   <select
                     className="input"
@@ -247,10 +275,11 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
                     ))}
                   </select>
                 </Field>
+                )}
               </>
             )}
 
-            {isArtist ? null : isMovie ? (
+            {isMusic ? null : isMovie ? (
               <>
                 <Field label="Minimum Availability">
                   <select
@@ -315,14 +344,14 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
 
             <div className="space-y-1">
               <Toggle
-                label={`Usar Portugas${isArtist ? ' (música PT)' : ' (desenhos animados)'}`}
+                label={`Usar Portugas${isMusic ? ' (música PT)' : ' (desenhos animados)'}`}
                 checked={opts.usePortugas}
                 onChange={(v) => setOpts({ ...opts, usePortugas: v })}
               />
               <p className="px-1 text-[11px] leading-snug text-silver">
                 Por defeito o Portugas é evitado (protecção Hit&nbsp;&amp;&nbsp;Run). Liga apenas
                 para conteúdo que queres mesmo ir buscar lá — tipicamente{' '}
-                {isArtist ? 'música portuguesa' : 'desenhos animados'}.
+                {isMusic ? 'música portuguesa' : 'desenhos animados'}.
               </p>
             </div>
 
@@ -332,7 +361,7 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
               ) : (
                 <SearchIcon size={18} />
               )}
-              Add to {isMovie ? 'Radarr' : isArtist ? 'Lidarr' : 'Sonarr'}
+              Add to {isMovie ? 'Radarr' : isMusic ? 'Lidarr' : 'Sonarr'}
             </button>
           </div>
         )}
