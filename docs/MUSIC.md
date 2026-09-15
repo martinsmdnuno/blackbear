@@ -44,6 +44,13 @@ o Portugas é que é a resposta.
 
 ---
 
+## Validado end-to-end (2026-09-15)
+
+Primeiro álbum a percorrer a cadeia toda — *Money for Nothing*, dos Dire Straits:
+grab → qBittorrent → import → **hardlink** (`nlink=2`, a pasta do torrent ocupa 40 K) →
+`Dire Straits/Money for Nothing (1988)/01 - Sultans of Swing.flac`, 12/12 faixas, 381 MB,
+FLAC 16/44. Demorou ~7 h por causa do swarm morto, não da configuração.
+
 ## Fases no Blackbear
 
 - [x] **Fase 1 — ligação.** `services/lidarr.js`, entrada no `config.js`, probe em
@@ -57,9 +64,10 @@ o Portugas é que é a resposta.
 
 ### Armadilhas conhecidas para a Fase 2
 
-1. **`eventType` do import.** Está confirmado que o filtro numérico funciona e que
-   `grabbed == 1`; falta confirmar que `3 == trackFileImported` contra um import real
-   antes de a Library confiar nisso. O código já aceita as duas formas.
+1. **`eventType` do import — confirmado.** Contra o import real do primeiro álbum:
+   `1 → grabbed`, `3 → trackFileImported` (um por faixa), `8 → downloadImported` (um por
+   release). A Library quer o **3**, não o 8: só os registos por faixa dizem em que álbum
+   o ficheiro aterrou.
 2. **Torrent-discografia.** A unidade natural é o álbum, mas um torrent traz muitas vezes
    a discografia inteira — um hash com N donos. O `hashOwners` já modela isto; falta a UI
    dizer em voz alta que apagar um álbum não liberta o torrent.

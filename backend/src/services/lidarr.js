@@ -46,9 +46,10 @@ export const trackFiles = (albumId) =>
 
 // Every import record. eventType 3 is trackFileImported, the counterpart of
 // Radarr's downloadFolderImported — its downloadId is the torrent infohash,
-// which is how the Library ties an album to its torrent(s). Confirmed that the
-// numeric filter works and grabbed == 1; the 3 → trackFileImported mapping
-// still wants checking against a real import before the Library trusts it.
+// which is how the Library ties an album to its torrent(s). Verified against a
+// real import: 1 → grabbed, 3 → trackFileImported (one per track), 8 →
+// downloadImported (one per release). The Library wants 3, not 8: only the
+// per-track records carry the album a file landed in.
 export const importHistory = () => client.allPages('/history?eventType=3');
 
 export const historyForDownload = (downloadId) =>
