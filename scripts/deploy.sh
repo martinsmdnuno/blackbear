@@ -19,6 +19,13 @@ set -euo pipefail
 HOST="${BLACKBEAR_HOST:-nunomartins@192.168.1.134}"
 DIR="${BLACKBEAR_DIR:-~/blackbear/blackbeard}"
 
+# A non-interactive SSH session on macOS gets a bare PATH (/usr/bin:/bin:/usr/sbin:
+# /sbin), which has no `docker` — Docker Desktop keeps its binaries elsewhere. Without
+# this the pull succeeds and the rebuild dies with "command not found: docker".
+# Harmless on the local path, and on Linux hosts where docker is already on PATH.
+DOCKER_PATH="/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:/opt/homebrew/bin"
+export PATH="${DOCKER_PATH}:${PATH}"
+
 TARGET="${HOST#*@}"
 
 LOCAL=false
@@ -45,6 +52,10 @@ if ${LOCAL}; then
   docker compose ps
 else
   echo "🏴‍☠️  Deploying to ${HOST}:${DIR}"
-  ssh "${HOST}" "cd ${DIR} && git pull --ff-only && docker compose up -d --build && docker compose ps"
+  # Note: if the rebuild ever fails on `docker-credential-desktop`, it's Docker
+  # Desktop reaching for the login keychain, which is locked in a non-interactive
+  # SSH session. Unlock it in the same command before building:
+  #   security unlock-keychain ~/Library/Keychains/login.keychain-db
+  ssh "${HOST}" "export PATH=\"${DOCKER_PATH}:\$PATH\" && cd ${DIR} && git pull --ff-only && docker compose up -d --build && docker compose ps"
 fi
 echo "✅ Done."
