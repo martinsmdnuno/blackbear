@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Film, Tv, RefreshCw, CalendarClock, Search, RotateCcw, Loader2, ScanSearch } from 'lucide-react';
+import {
+  Film,
+  Tv,
+  Disc3,
+  RefreshCw,
+  CalendarClock,
+  Search,
+  RotateCcw,
+  Loader2,
+  ScanSearch
+} from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import ReleasePickerSheet from './ReleasePickerSheet.jsx';
@@ -127,6 +137,26 @@ function MovieCard({ m, busy, onSearch, onRenew, onPick }) {
   );
 }
 
+function AlbumCard({ a, busy, onSearch, onRenew, onPick }) {
+  return (
+    <div className="card flex gap-3 p-3">
+      <Poster src={a.poster} fallback={Disc3} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <p className="min-w-0 flex-1 font-semibold leading-tight text-parchment">{a.artist}</p>
+          {whenPill(a)}
+        </div>
+        <p className="truncate text-xs text-silver" title={a.title}>
+          <span className="text-gold-light">{truncate(a.title, 42)}</span>
+          {a.albumType ? ` · ${a.albumType}` : ''}
+        </p>
+        <p className="mt-2 text-xs text-silver">{shortDate(a.date)}</p>
+        <RenewAction item={a} busy={busy} onSearch={onSearch} onRenew={onRenew} onPick={onPick} />
+      </div>
+    </div>
+  );
+}
+
 function EpisodeCard({ e, busy, onSearch, onRenew, onPick }) {
   const code = `S${String(e.season).padStart(2, '0')}E${String(e.episode).padStart(2, '0')}`;
   return (
@@ -228,6 +258,7 @@ export default function UpcomingTab() {
 
   const movies = data?.movies?.items || [];
   const episodes = data?.episodes?.items || [];
+  const albums = data?.albums?.items || [];
 
   // Seasons with 2+ missing episodes still lacking an active download.
   const seasonGroups = useMemo(() => {
@@ -263,6 +294,14 @@ export default function UpcomingTab() {
       () => api.renewQueue('radarr', m.queue.id, m.queue.downloadId),
       `Renewing "${m.title}" — old download blocklisted, searching again`
     );
+  const searchAlbum = (a) =>
+    run(`album:${a.id}`, () => api.renewAlbum(a.id), `Searching indexers for "${a.title}"`);
+  const renewAlbum = (a) =>
+    run(
+      `album:${a.id}`,
+      () => api.renewQueue('lidarr', a.queue.id, a.queue.downloadId),
+      `Renewing "${a.title}" — old download blocklisted, searching again`
+    );
   const searchEpisode = (e) =>
     run(`ep:${e.id}`, () => api.renewEpisode(e.id), `Searching indexers for ${e.series}`);
   const renewEpisode = (e) =>
@@ -280,6 +319,8 @@ export default function UpcomingTab() {
 
   const pickMovie = (m) =>
     setPicker({ type: 'movie', service: 'radarr', id: m.id, label: `${m.title}${m.year ? ` (${m.year})` : ''}` });
+  const pickAlbum = (a) =>
+    setPicker({ type: 'album', service: 'lidarr', id: a.id, label: `${a.artist} · ${a.title}` });
   const pickEpisode = (e) =>
     setPicker({
       type: 'episode',
@@ -355,6 +396,29 @@ export default function UpcomingTab() {
                   onSearch={() => searchMovie(m)}
                   onRenew={() => renewMovie(m)}
                   onPick={() => pickMovie(m)}
+                />
+              ))
+            )}
+          </Section>
+
+          <Section title="Albums" count={albums.length} icon={Disc3}>
+            {data.albums?.error ? (
+              <p className="rounded-xl border border-blood/40 bg-blood/10 px-3 py-2.5 text-sm text-blood-light">
+                Lidarr: {data.albums.error}
+              </p>
+            ) : albums.length === 0 ? (
+              <p className="rounded-xl bg-night-850 px-3 py-4 text-center text-sm text-silver">
+                No monitored albums awaiting release or download.
+              </p>
+            ) : (
+              albums.map((a) => (
+                <AlbumCard
+                  key={a.id}
+                  a={a}
+                  busy={busyKey === `album:${a.id}`}
+                  onSearch={() => searchAlbum(a)}
+                  onRenew={() => renewAlbum(a)}
+                  onPick={() => pickAlbum(a)}
                 />
               ))
             )}

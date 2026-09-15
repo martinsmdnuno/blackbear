@@ -107,8 +107,16 @@ export const health = () => client.get('/health');
 
 export const diskSpace = () => client.get('/diskspace');
 
+// includeArtist so the Upcoming view can show who the album belongs to without
+// a second round trip per row.
 export const calendar = (start, end) =>
-  client.get(`/calendar?start=${start}&end=${end}&unmonitored=false`);
+  client.get(`/calendar?start=${start}&end=${end}&unmonitored=false&includeArtist=true`);
+
+// Monitored albums that are out but not on disk.
+export const missing = (pageSize = 200) =>
+  client.get(
+    `/wanted/missing?page=1&pageSize=${pageSize}&sortKey=releaseDate&sortDirection=descending&includeArtist=true`
+  );
 
 export const history = (pageSize = 100) =>
   client.get(

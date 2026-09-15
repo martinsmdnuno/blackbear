@@ -199,8 +199,14 @@ export function summarizeTorrent(t, privacy, { busy = new Set(), owners = new Ma
 // --- Normalisation -------------------------------------------------------------
 
 // Radarr/Sonarr call it a poster; Lidarr calls an album's artwork a cover.
+// For anything already in its library Lidarr hands back a *local* path
+// (/config/MediaCover/…) instead of a remote URL, which the browser would try
+// to load from the app's own origin and fail — so only absolute URLs count.
+const isAbsolute = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
+
 const posterOf = (images) =>
-  images?.find((i) => i.coverType === 'poster' || i.coverType === 'cover')?.remoteUrl || null;
+  images?.map((i) => (i.coverType === 'poster' || i.coverType === 'cover' ? i.remoteUrl : null))
+    .find(isAbsolute) || null;
 
 const parentDir = (path) => (path ? path.slice(0, path.lastIndexOf('/')) || null : null);
 

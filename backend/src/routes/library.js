@@ -239,15 +239,19 @@ router.get('/', async (_req, res) => {
   }
 });
 
-// GET /api/library/ids — owned TMDb ids, to flag "already in library" elsewhere
+// GET /api/library/ids — owned ids, to flag "already in library" elsewhere.
+// Movies and series are TMDb ids; music has no TMDb, so artists are identified
+// by their MusicBrainz id, which is what Lidarr matches on.
 router.get('/ids', async (_req, res) => {
-  const [movies, series] = await Promise.all([
+  const [movies, series, artists] = await Promise.all([
     settle(radarr.allMovies, []),
-    settle(sonarr.allSeries, [])
+    settle(sonarr.allSeries, []),
+    settle(lidarr.allArtists, [])
   ]);
   res.json({
     movie: (movies.data || []).map((m) => m.tmdbId).filter(Boolean),
-    series: (series.data || []).map((s) => s.tmdbId).filter(Boolean)
+    series: (series.data || []).map((s) => s.tmdbId).filter(Boolean),
+    artist: (artists.data || []).map((a) => a.foreignArtistId).filter(Boolean)
   });
 });
 

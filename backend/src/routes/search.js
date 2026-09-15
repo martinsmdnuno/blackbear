@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as sonarr from '../services/sonarr.js';
 import * as radarr from '../services/radarr.js';
+import * as lidarr from '../services/lidarr.js';
 import * as tmdb from '../services/tmdb.js';
 
 const router = Router();
@@ -25,15 +26,22 @@ router.get('/person/:id', async (req, res) => {
   }
 });
 
-// GET /api/search?type=movie|series&term=...
+// GET /api/search?type=movie|series|artist&term=...
+const LOOKUP = {
+  movie: (term) => radarr.lookup(term),
+  series: (term) => sonarr.lookup(term),
+  artist: (term) => lidarr.lookupArtist(term)
+};
+
 router.get('/', async (req, res) => {
   const { type, term } = req.query;
   if (!term || !term.trim()) return res.status(400).json({ error: 'Missing search term' });
-  if (type !== 'movie' && type !== 'series') {
-    return res.status(400).json({ error: 'type must be "movie" or "series"' });
+  const lookup = LOOKUP[type];
+  if (!lookup) {
+    return res.status(400).json({ error: `type must be one of: ${Object.keys(LOOKUP).join(', ')}` });
   }
   try {
-    const results = type === 'movie' ? await radarr.lookup(term) : await sonarr.lookup(term);
+    const results = await lookup(term);
     res.json(Array.isArray(results) ? results : []);
   } catch (err) {
     res.status(502).json({ error: err.message });

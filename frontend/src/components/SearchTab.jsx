@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Film, Tv, User, Plus, Loader2, X, Star, Check } from 'lucide-react';
+import { Search, Film, Tv, Disc3, User, Plus, Loader2, X, Star, Check } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
 import LinkGrab from './LinkGrab.jsx';
-import { truncate } from '../lib/format.js';
+import { truncate, artwork } from '../lib/format.js';
 
 // Radarr/Sonarr lookups embed ratings. Prefer IMDb, then TMDb, then the simple
 // (TVDB/community) value — so you can sanity-check a title before adding.
@@ -38,16 +38,20 @@ function InLibraryBadge() {
 const MODES = [
   { id: 'movie', label: 'Movie', icon: Film },
   { id: 'series', label: 'Series', icon: Tv },
+  { id: 'artist', label: 'Music', icon: Disc3 },
   { id: 'person', label: 'Person', icon: User }
 ];
 
-// Stable identity for a lookup result — matches the render key below.
+// Stable identity for a lookup result — matches the render key below. Music has
+// no TMDb/TVDb id; Lidarr matches artists on their MusicBrainz id.
 function resultKey(it) {
-  return it.tmdbId || it.tvdbId || it.titleSlug;
+  return it.tmdbId || it.tvdbId || it.foreignArtistId || it.titleSlug;
 }
 
-function ResultCard({ item, owned, onAdd }) {
-  const poster = item.images?.find((i) => i.coverType === 'poster')?.remoteUrl;
+function ResultCard({ item, mode, owned, onAdd }) {
+  const isArtist = mode === 'artist';
+  const poster = artwork(item.images);
+  const name = isArtist ? item.artistName : item.title;
   return (
     <button
       onClick={onAdd}
@@ -58,24 +62,36 @@ function ResultCard({ item, owned, onAdd }) {
           <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full items-center justify-center text-silver/70">
-            <Film size={24} />
+            {isArtist ? <Disc3 size={24} /> : <Film size={24} />}
           </div>
         )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
-          <h3 className="flex-1 font-semibold leading-tight text-parchment">{item.title}</h3>
+          <h3 className="flex-1 font-semibold leading-tight text-parchment">{name}</h3>
           <span className="shrink-0 rounded-md bg-gold/15 px-1.5 py-0.5 text-gold">
             <Plus size={16} />
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-silver">
-          <span>{item.year || 'Unknown year'}</span>
-          <RatingBadge rating={pickRating(item.ratings)} />
+          {isArtist ? (
+            <>
+              {item.disambiguation && <span>{truncate(item.disambiguation, 40)}</span>}
+              {item.artistType && <span className="text-gold-light">{item.artistType}</span>}
+              {(item.genres || []).length > 0 && (
+                <span>{truncate(item.genres.slice(0, 3).join(' · '), 40)}</span>
+              )}
+            </>
+          ) : (
+            <>
+              <span>{item.year || 'Unknown year'}</span>
+              <RatingBadge rating={pickRating(item.ratings)} />
+            </>
+          )}
           {owned && <InLibraryBadge />}
         </div>
         <p className="mt-1.5 text-xs leading-relaxed text-silver">
-          {truncate(item.overview, 140) || 'No synopsis available.'}
+          {truncate(item.overview, 140) || (isArtist ? 'No biography available.' : 'No synopsis available.')}
         </p>
       </div>
     </button>
@@ -241,14 +257,24 @@ export default function SearchTab() {
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [lookingUp, setLookingUp] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [ownedIds, setOwnedIds] = useState({ movie: new Set(), series: new Set() });
+  const [ownedIds, setOwnedIds] = useState({
+    movie: new Set(),
+    series: new Set(),
+    artist: new Set()
+  });
   const [added, setAdded] = useState(new Set());
   const debounce = useRef(null);
 
   useEffect(() => {
     api
       .libraryIds()
-      .then((d) => setOwnedIds({ movie: new Set(d.movie || []), series: new Set(d.series || []) }))
+      .then((d) =>
+        setOwnedIds({
+          movie: new Set(d.movie || []),
+          series: new Set(d.series || []),
+          artist: new Set(d.artist || [])
+        })
+      )
       .catch(() => {});
   }, []);
 
@@ -256,9 +282,13 @@ export default function SearchTab() {
   // library" and update ownedIds so person-credit cards pick it up too.
   function handleAdded(type, item) {
     setAdded((s) => new Set(s).add(resultKey(item)));
-    if (item.tmdbId) {
-      const key = type === 'movie' ? 'movie' : 'series';
-      setOwnedIds((o) => ({ ...o, [key]: new Set(o[key]).add(item.tmdbId) }));
+    // Artists are tracked by MusicBrainz id, everything else by TMDb id.
+    const owned =
+      type === 'artist'
+        ? { key: 'artist', id: item.foreignArtistId }
+        : { key: type === 'movie' ? 'movie' : 'series', id: item.tmdbId };
+    if (owned.id) {
+      setOwnedIds((o) => ({ ...o, [owned.key]: new Set(o[owned.key]).add(owned.id) }));
     }
   }
 
@@ -306,7 +336,12 @@ export default function SearchTab() {
     }
   }
 
-  const placeholders = { movie: 'movies', series: 'series', person: 'actors & directors' };
+  const placeholders = {
+    movie: 'movies',
+    series: 'series',
+    artist: 'artists',
+    person: 'actors & directors'
+  };
 
   return (
     <div className="space-y-4">
@@ -387,6 +422,7 @@ export default function SearchTab() {
               <ResultCard
                 key={resultKey(item)}
                 item={item}
+                mode={mode}
                 owned={item.id > 0 || added.has(resultKey(item))}
                 onAdd={() => setSelected({ type: mode, item })}
               />

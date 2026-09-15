@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import * as sonarr from '../services/sonarr.js';
 import * as radarr from '../services/radarr.js';
+import * as lidarr from '../services/lidarr.js';
 
 const router = Router();
+
+const ARR = { sonarr, radarr, lidarr };
 
 // Trim an *arr release down to what the picker UI needs. guid+indexerId is the
 // pair the grab endpoint requires; everything else is display data.
@@ -57,6 +60,17 @@ router.get('/episode/:id', async (req, res) => {
   }
 });
 
+// GET /api/releases/album/:id — candidate releases for one album. A release is
+// often a whole discography, which the picker shows as-is: the size gives it
+// away, and grabbing it is sometimes exactly what you want.
+router.get('/album/:id', async (req, res) => {
+  try {
+    send(res, await lidarr.albumReleases(Number(req.params.id)));
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // GET /api/releases/season?seriesId=&seasonNumber= — candidate season packs.
 router.get('/season', async (req, res) => {
   const { seriesId, seasonNumber } = req.query;
@@ -75,7 +89,7 @@ router.get('/season', async (req, res) => {
 // logic (rejected releases can be grabbed too — that's the point).
 router.post('/grab', async (req, res) => {
   const { service, guid, indexerId } = req.body || {};
-  const svc = service === 'sonarr' ? sonarr : service === 'radarr' ? radarr : null;
+  const svc = ARR[service];
   if (!svc) return res.status(400).json({ error: `Unknown service "${service}"` });
   if (!guid || indexerId == null) {
     return res.status(400).json({ error: 'guid and indexerId are required' });

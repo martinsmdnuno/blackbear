@@ -1,5 +1,6 @@
 import * as radarr from './radarr.js';
 import * as sonarr from './sonarr.js';
+import * as lidarr from './lidarr.js';
 import * as prowlarr from './prowlarr.js';
 import { httpRequest } from './http.js';
 
@@ -23,7 +24,9 @@ import { httpRequest } from './http.js';
 export const TAG_LABEL = 'portugas';
 const INDEXER_MATCH = 'portugas';
 
-const svcByName = { radarr, sonarr };
+// Lidarr joins the guard on the same terms: the Portugas indexer is tagged
+// inside it too, so it is only ever queried for artists carrying the tag.
+const svcByName = { radarr, sonarr, lidarr };
 
 const matchesPortugas = (name) => (name || '').toLowerCase().includes(INDEXER_MATCH);
 
