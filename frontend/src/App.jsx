@@ -17,7 +17,7 @@ const TABS = [
 ];
 
 const TITLES = {
-  add: 'Add Movies & Series',
+  add: 'Add to the Library',
   trending: 'Trending Now',
   upcoming: 'Upcoming Releases',
   library: 'Library Management',

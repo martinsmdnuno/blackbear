@@ -83,6 +83,14 @@ export const api = {
       timeout: 150000
     }),
 
+  seriesSeasons: (id) => req(`/series/${id}/seasons`),
+  setSeason: (id, seasonNumber, body) =>
+    req(`/series/${id}/seasons/${seasonNumber}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      timeout: 60000
+    }),
+
   seeding: () => req('/seeding'),
   seedingDelete: (hashes) =>
     req('/seeding/delete', { method: 'POST', body: JSON.stringify({ hashes }) }),

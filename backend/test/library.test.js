@@ -12,6 +12,13 @@ import {
   summarizeTorrent,
   torrentIndex
 } from '../src/services/library.js';
+import {
+  artistInTerm,
+  findArtist,
+  rankAlbums,
+  stripArtist,
+  termPrefixes
+} from '../src/services/musicSearch.js';
 
 const HASH_A = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const HASH_B = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
@@ -395,5 +402,93 @@ describe('plan execution', () => {
     });
     assert.equal(res.ok, false);
     assert.deepEqual(res.steps.map((s) => s.status), ['ok', 'ok', 'error']);
+  });
+});
+
+/* --------------------------- music album search --------------------------- */
+
+describe('album search ranking', () => {
+  const pf = (title, albumType = 'Album', secondaryTypes = [], artistName = 'Pink Floyd') => ({
+    title,
+    albumType,
+    secondaryTypes,
+    foreignAlbumId: `${artistName}:${title}`,
+    artist: { artistName }
+  });
+
+  test('finds the artist named inside the search term, longest name first', () => {
+    const artists = [{ artistName: 'Pink' }, { artistName: 'Pink Floyd' }];
+    assert.equal(artistInTerm('pink floyd animals', artists).artistName, 'Pink Floyd');
+    assert.equal(artistInTerm('animals', artists), null);
+  });
+
+  test('strips the artist name to leave the album title', () => {
+    assert.equal(stripArtist('Pink Floyd The Wall', 'Pink Floyd'), 'the wall');
+    // Searching the artist alone leaves no title to look up.
+    assert.equal(stripArtist('Pink Floyd', 'Pink Floyd'), '');
+  });
+
+  test("the studio album beats live bootlegs and other artists' records", () => {
+    const ranked = rankAlbums(
+      [
+        pf('Pink Floyd Animals Album Cover', 'Album', [], 'Meredith Zall'),
+        pf('1977-04-26: Animals at the Omni', 'Album', ['Live']),
+        pf('Animals: Limited Edition Trance Remix', 'Album', ['Remix']),
+        pf('Animals'),
+        pf('Animals Unreleased Sessions', 'Album', ['Compilation'])
+      ],
+      { termTitle: 'animals', artistName: 'Pink Floyd' }
+    );
+    assert.equal(ranked[0].title, 'Animals');
+    assert.equal(ranked[ranked.length - 1].title, 'Pink Floyd Animals Album Cover');
+  });
+
+  test('walks back a word at a time when the full term names no artist', async () => {
+    // Lidarr matches artist names against the whole string, so "Pink Floyd The
+    // Wall" returns only tribute bands — the real artist is one prefix back.
+    const byTerm = {
+      'Pink Floyd The Wall': [{ artistName: 'Pink Floyd the Barber' }],
+      'pink floyd the': [],
+      'pink floyd': [{ artistName: 'Pink Floyd' }]
+    };
+    const found = await findArtist('Pink Floyd The Wall', async (t) => byTerm[t] || []);
+    assert.equal(found.artistName, 'Pink Floyd');
+  });
+
+  test('prefixes go longest first and never repeat the whole term', () => {
+    assert.deepEqual(termPrefixes('pink floyd the wall'), ['pink floyd the', 'pink floyd', 'pink']);
+  });
+
+  test('popularity breaks ties when the term names no artist', () => {
+    const rec = (artistName, votes) => ({
+      title: 'Dark Side of the Moon',
+      albumType: 'Album',
+      secondaryTypes: [],
+      foreignAlbumId: artistName,
+      artist: { artistName },
+      ratings: { votes, value: 9 }
+    });
+    const ranked = rankAlbums([rec('Medicine Head', 1), rec('Pink Floyd', 900)], {
+      termTitle: 'dark side of the moon'
+    });
+    assert.equal(ranked[0].artist.artistName, 'Pink Floyd');
+  });
+
+  test('a false-positive artist match cannot bury an exact title match', () => {
+    // There is an artist called "OK", so "OK Computer" gets read as the album
+    // "Computer" by OK. Scoring the whole term as a title too saves it.
+    const ranked = rankAlbums(
+      [
+        { title: 'computer', albumType: 'Album', foreignAlbumId: 'a', artist: { artistName: 'grape milk' } },
+        { title: 'OK Computer', albumType: 'Album', foreignAlbumId: 'b', artist: { artistName: 'Radiohead' }, ratings: { votes: 88 } }
+      ],
+      { termTitle: 'computer', artistName: 'OK', fullTerm: 'OK Computer' }
+    );
+    assert.equal(ranked[0].artist.artistName, 'Radiohead');
+  });
+
+  test('deduplicates albums returned by both lookups', () => {
+    const ranked = rankAlbums([pf('The Wall'), pf('The Wall')], { termTitle: 'the wall' });
+    assert.equal(ranked.length, 1);
   });
 });

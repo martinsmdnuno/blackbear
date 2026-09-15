@@ -25,6 +25,14 @@ export const deleteSeries = (id, deleteFiles, addExclusion = false) =>
 
 export const episodeFiles = (seriesId) => client.get(`/episodefile?seriesId=${seriesId}`);
 
+// Season monitoring lives on the series record, so changing one season means
+// writing the whole series back.
+export const updateSeries = (series) => client.put(`/series/${series.id}`, series);
+
+// What Sonarr is doing right now. Adding a series queues a RefreshSeries that
+// rewrites season monitoring when it lands (same trap as Lidarr's artists).
+export const commands = () => client.get('/command');
+
 // Every downloadFolderImported (eventType 3) record — its downloadId is the
 // torrent hash, which is how the Library ties a series to its torrent(s).
 export const importHistory = () => client.allPages('/history?eventType=3');
