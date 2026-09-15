@@ -57,17 +57,47 @@ async function addAlbum(item, options, tags, rootFolderPath) {
   return { ...settled, artist: { id: artist.id, artistName: artist.artistName } };
 }
 
-// Block while Lidarr is refreshing artist metadata.
-async function waitForRefresh(timeoutMs = 90000) {
+// Monitor exactly these seasons and nothing else. Adding a series queues a
+// RefreshSeries that rewrites season monitoring when it finishes, so this waits
+// it out and then reads the result back — the same trap Lidarr's artists set,
+// where the API happily reports a flag that is about to be reverted.
+async function monitorSeasons(seriesId, seasonNumbers, timeoutMs = 90000) {
+  const wanted = new Set(seasonNumbers);
+  const deadline = Date.now() + timeoutMs;
+
+  await waitForCommands(sonarr, /^(RefreshSeries|RescanSeries)$/i);
+
+  while (Date.now() < deadline) {
+    const series = await sonarr.series(seriesId);
+    for (const s of series.seasons || []) s.monitored = wanted.has(s.seasonNumber);
+    series.monitored = true;
+    await sonarr.updateSeries(series);
+
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const fresh = await sonarr.series(seriesId);
+    const ok = (fresh.seasons || []).every((s) => s.monitored === wanted.has(s.seasonNumber));
+    if (ok) return fresh;
+  }
+  throw new Error(
+    'Sonarr kept resetting the season monitoring — its refresh may still be running. Check the series and try again.'
+  );
+}
+
+// Block while the service is busy with a command whose name matches.
+async function waitForCommands(svc, pattern, timeoutMs = 90000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const active = ((await lidarr.commands()) || []).filter(
-      (c) => /^(RefreshArtist|RescanFolders)$/i.test(c.name) && ['queued', 'started'].includes(c.status)
+    const active = ((await svc.commands()) || []).filter(
+      (c) => pattern.test(c.name) && ['queued', 'started'].includes(c.status)
     );
     if (!active.length) return;
     await new Promise((r) => setTimeout(r, 1500));
   }
 }
+
+// Block while Lidarr is refreshing artist metadata.
+const waitForRefresh = () => waitForCommands(lidarr, /^(RefreshArtist|RescanFolders)$/i);
 
 // Marking the album monitored once is not enough. Adding an artist queues a
 // metadata refresh that runs in the background and rewrites every album's
@@ -232,23 +262,37 @@ router.post('/', async (req, res) => {
       return res.status(201).json(added);
     }
 
+    // Picking specific seasons is not something Sonarr's add options can
+    // express, so the series goes in with nothing monitored and the seasons are
+    // set afterwards — once its refresh has stopped rewriting them.
+    const wantedSeasons = Array.isArray(options.seasons)
+      ? options.seasons.map(Number).filter(Number.isInteger)
+      : null;
+    const pickSeasons = wantedSeasons && wantedSeasons.length > 0;
+
     const payload = {
       ...item,
       qualityProfileId: options.qualityProfileId,
       rootFolderPath,
-      monitored: options.monitor !== 'none',
+      monitored: pickSeasons ? true : options.monitor !== 'none',
       seasonFolder: options.seasonFolder !== false,
       seriesType: options.seriesType || 'standard',
       tags,
       addOptions: {
-        monitor: options.monitor || 'all',
-        searchForMissingEpisodes: options.searchOnAdd === true,
+        monitor: pickSeasons ? 'none' : options.monitor || 'all',
+        searchForMissingEpisodes: pickSeasons ? false : options.searchOnAdd === true,
         searchForCutoffUnmetEpisodes: false
       }
     };
     delete payload.id;
     const added = await sonarr.addSeries(payload);
-    return res.status(201).json(added);
+    if (!pickSeasons) return res.status(201).json(added);
+
+    const withSeasons = await monitorSeasons(added.id, wantedSeasons);
+    if (options.searchOnAdd === true) {
+      for (const n of wantedSeasons) await sonarr.searchSeason(added.id, n);
+    }
+    return res.status(201).json(withSeasons);
   } catch (err) {
     const { status, error } = await humanizeAddError(type, item, err.message || '');
     res.status(status).json({ error });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Loader2, Search as SearchIcon } from 'lucide-react';
+import { X, Loader2, Search as SearchIcon, Check } from 'lucide-react';
 import { api } from '../api/client.js';
 import { artwork } from '../lib/format.js';
 import { useToast } from './Toast.jsx';
@@ -12,6 +12,7 @@ const MIN_AVAILABILITY = [
 
 const SERIES_MONITOR = [
   { value: 'all', label: 'All episodes' },
+  { value: 'seasons', label: 'Specific seasons…' },
   { value: 'future', label: 'Future episodes' },
   { value: 'missing', label: 'Missing episodes' },
   { value: 'existing', label: 'Existing episodes' },
@@ -99,6 +100,7 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
     seasonFolder: true,
     seriesType: 'standard',
     metadataProfileId: null,
+    seasons: [],
     searchOnAdd: true,
     usePortugas: false
   });
@@ -151,7 +153,16 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
     }
     setSubmitting(true);
     try {
-      await api.add({ type, item, options: opts });
+      const options =
+        opts.monitor === 'seasons'
+          ? { ...opts, seasons: opts.seasons }
+          : { ...opts, seasons: undefined };
+      if (opts.monitor === 'seasons' && !opts.seasons.length) {
+        toast.error('Pick at least one season');
+        setSubmitting(false);
+        return;
+      }
+      await api.add({ type, item, options });
       const where = isMovie ? 'Radarr' : isMusic ? 'Lidarr' : 'Sonarr';
       toast.success(`${title} added to ${where}`);
       onAdded?.(type, item);
@@ -315,6 +326,51 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
                     ))}
                   </select>
                 </Field>
+                {opts.monitor === 'seasons' && (
+                  <div className="space-y-1.5 rounded-xl bg-night-900 p-3">
+                    <p className="text-xs text-silver">
+                      Only the seasons you tick are monitored. Sonarr grabs nothing for the rest.
+                    </p>
+                    <div className="max-h-44 space-y-1 overflow-y-auto">
+                      {(item.seasons || [])
+                        .slice()
+                        .sort((a, b) => a.seasonNumber - b.seasonNumber)
+                        .map((s) => {
+                          const on = opts.seasons.includes(s.seasonNumber);
+                          return (
+                            <button
+                              key={s.seasonNumber}
+                              type="button"
+                              onClick={() =>
+                                setOpts({
+                                  ...opts,
+                                  seasons: on
+                                    ? opts.seasons.filter((n) => n !== s.seasonNumber)
+                                    : [...opts.seasons, s.seasonNumber]
+                                })
+                              }
+                              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition
+                                          ${on ? 'bg-gold/15 text-gold' : 'text-silver hover:bg-night-800'}`}
+                            >
+                              <span
+                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border
+                                            ${on ? 'border-gold bg-gold text-night-950' : 'border-night-700'}`}
+                              >
+                                {on && <Check size={11} strokeWidth={3} />}
+                              </span>
+                              {s.seasonNumber === 0 ? 'Specials' : `Season ${s.seasonNumber}`}
+                            </button>
+                          );
+                        })}
+                      {!(item.seasons || []).length && (
+                        <p className="px-1 py-2 text-xs text-silver">
+                          Sonarr's lookup listed no seasons for this title.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <Field label="Series Type">
                   <select
                     className="input"

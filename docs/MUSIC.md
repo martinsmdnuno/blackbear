@@ -96,6 +96,23 @@ FLAC 16/44. Demorou ~7 h por causa do swarm morto, não da configuração.
    `import` esquecido (`Disc3`) compilou sem queixa e rebentou como `ReferenceError` só
    ao abrir a página. Foi apanhado no browser, não no build.
 
+### A unidade certa para cada meio (2026-09-15)
+
+A procura pedia sempre o objeto inteiro: um filme *é* a unidade, mas uma série e um
+artista não são. Agora escolhe-se a parte:
+
+- **Música**: o modo Music alterna entre **Álbum** (por omissão) e **Artista**. Adicionar
+  um álbum cria o artista por baixo sem monitorizar mais nada — "os Pink Floyd sem trazer
+  15 discos atrás".
+- **Séries**: o painel de adicionar tem "Specific seasons…" com checkboxes, e uma série já
+  na biblioteca abre a lista de temporadas com o estado de cada uma e um botão Grab.
+
+Duas armadilhas, a mesma em dois sítios: tanto o `RefreshArtist` do Lidarr como o
+`RefreshSeries` do Sonarr correm em segundo plano **depois** de adicionar e reescrevem os
+flags de monitorização. Marcar antes de eles acabarem é escrever na areia — e a API
+devolve alegremente `monitored: true` para algo que vai ser desmarcado a seguir. A cura é
+a mesma nos dois: esperar pelo comando, escrever, e reler para confirmar.
+
 ### Ainda por resolver
 
 1. **Torrent-discografia.** A unidade natural é o álbum, mas um torrent traz muitas vezes

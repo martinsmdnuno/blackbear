@@ -3,6 +3,7 @@ import { Search, Film, Tv, Disc3, User, Plus, Loader2, X, Star, Check } from 'lu
 import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
+import SeasonSheet from './SeasonSheet.jsx';
 import LinkGrab from './LinkGrab.jsx';
 import { truncate, artwork } from '../lib/format.js';
 
@@ -301,6 +302,7 @@ export default function SearchTab() {
   // Dentro de Music: procurar o artista inteiro ou um álbum só.
   const [musicKind, setMusicKind] = useState('album');
   const [albumHint, setAlbumHint] = useState(null);
+  const [seasonsFor, setSeasonsFor] = useState(null);
   const [ownedIds, setOwnedIds] = useState({
     movie: new Set(),
     series: new Set(),
@@ -535,7 +537,13 @@ export default function SearchTab() {
                   item={item}
                   mode={searchType}
                   owned={item.id > 0 || added.has(resultKey(item))}
-                  onAdd={() => setSelected({ type: searchType, item })}
+                  onAdd={() =>
+                    // A series already in Sonarr doesn't need adding — what you
+                    // came for is a season it's missing.
+                    searchType === 'series' && item.id > 0
+                      ? setSeasonsFor(item)
+                      : setSelected({ type: searchType, item })
+                  }
                 />
               ))}
       </div>
@@ -557,6 +565,8 @@ export default function SearchTab() {
           ownedIds={ownedIds}
         />
       )}
+
+      {seasonsFor && <SeasonSheet series={seasonsFor} onClose={() => setSeasonsFor(null)} />}
 
       {selected && (
         <AddSheet
