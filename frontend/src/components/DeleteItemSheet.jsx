@@ -24,7 +24,8 @@ import { bytes, duration } from '../lib/format.js';
 //
 // Stages: review → (confirm, for private trackers) → running → done
 
-const SERVICE_LABEL = { radarr: 'Radarr', sonarr: 'Sonarr' };
+const SERVICE_LABEL = { radarr: 'Radarr', sonarr: 'Sonarr', lidarr: 'Lidarr' };
+const TYPE_NOUN = { movie: 'movie', series: 'series', album: 'album' };
 
 function Box({ tone, icon: Icon, title, children }) {
   const tones = {
@@ -70,6 +71,13 @@ function Check({ checked, disabled, onChange, label, hint }) {
 function stepLabel(step) {
   if (step.kind === 'torrent') return 'Remove the torrent from qBittorrent, with its files';
   const where = SERVICE_LABEL[step.service] || step.service;
+  // Music deletes differently: the album record stays (Lidarr rebuilds it from
+  // MusicBrainz anyway) and what goes are the track files, after unmonitoring.
+  if (step.service === 'lidarr') {
+    return step.deleteFiles
+      ? 'Unmonitor the album in Lidarr and delete its track files'
+      : 'Unmonitor the album in Lidarr (files kept)';
+  }
   return (
     `Delete from ${where}${step.deleteFiles ? ', with the library files' : ' (files kept)'}` +
     (step.addExclusion ? ', and add an import exclusion' : '')
@@ -251,9 +259,10 @@ export default function DeleteItemSheet({ item, simulate, onClose }) {
         <div className="flex items-start gap-3 p-5 pb-3">
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-lg font-bold text-parchment">
-              {stage === 'done' ? 'Result' : `Delete ${item.type === 'movie' ? 'movie' : 'series'}`}
+              {stage === 'done' ? 'Result' : `Delete ${TYPE_NOUN[item.type] || 'item'}`}
             </h3>
             <p className="truncate text-sm text-silver">
+              {item.artist ? `${item.artist} — ` : ''}
               {item.title}
               {item.year ? ` (${item.year})` : ''} · {bytes(item.sizeOnDisk)}
             </p>
@@ -320,14 +329,18 @@ export default function DeleteItemSheet({ item, simulate, onClose }) {
                       disabled={locked || torrents.length === 0}
                       onChange={setKeepSeeding}
                       label="Keep the torrent seeding"
-                      hint="Only removes the title from Radarr/Sonarr — the torrent stays alive."
+                      hint="Only removes the title from the library — the torrent stays alive."
                     />
-                    <Check
-                      checked={addExclusion}
-                      onChange={setAddExclusion}
-                      label="Add an import exclusion"
-                      hint="Stops import lists from adding it back."
-                    />
+                    {/* Lidarr has no album-level import exclusion, so the option
+                        is hidden rather than shown doing nothing. */}
+                    {item.type !== 'album' && (
+                      <Check
+                        checked={addExclusion}
+                        onChange={setAddExclusion}
+                        label="Add an import exclusion"
+                        hint="Stops import lists from adding it back."
+                      />
+                    )}
                   </div>
 
                   <div className="space-y-1.5">

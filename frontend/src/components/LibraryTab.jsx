@@ -6,6 +6,7 @@ import {
   HardDrive,
   Film,
   Tv,
+  Disc3,
   Search,
   FlaskConical,
   AlertTriangle,
@@ -74,12 +75,16 @@ function Pill({ tone, children, title }) {
   );
 }
 
+const TYPE_ICON = { movie: Film, series: Tv, album: Disc3 };
+const TYPE_LABEL = { movie: 'Movie', series: 'Series', album: 'Album' };
+
 function LibraryRow({ item, onDelete }) {
-  const TypeIcon = item.type === 'movie' ? Film : Tv;
+  const TypeIcon = TYPE_ICON[item.type] || Film;
   const meta = [
     bytes(item.sizeOnDisk),
     item.quality,
     item.type === 'series' ? `${item.fileCount} ep${item.fileCount === 1 ? '' : 's'}` : null,
+    item.type === 'album' ? `${item.fileCount} track${item.fileCount === 1 ? '' : 's'}` : null,
     item.added ? `added ${shortDate(item.added)}` : null
   ]
     .filter(Boolean)
@@ -96,14 +101,18 @@ function LibraryRow({ item, onDelete }) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold text-parchment" title={item.title}>
+        <p
+          className="truncate font-semibold text-parchment"
+          title={item.artist ? `${item.artist} — ${item.title}` : item.title}
+        >
+          {item.artist && <span className="font-normal text-silver">{item.artist} — </span>}
           {item.title}
           {item.year && <span className="font-normal text-silver"> ({item.year})</span>}
         </p>
         <p className="truncate text-xs text-silver">{meta}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <Pill tone="bg-night-700 text-silver">
-            <TypeIcon size={11} /> {item.type === 'movie' ? 'Movie' : 'Series'}
+            <TypeIcon size={11} /> {TYPE_LABEL[item.type] || item.type}
           </Pill>
           {privateGroups(item.torrents).map(([tracker, torrents]) => (
             <PrivateTrackerBadge key={tracker} tracker={tracker} torrents={torrents} />
@@ -178,7 +187,9 @@ function LibraryItems() {
       .filter((i) => type === 'all' || i.type === type)
       .filter((i) => privacy === 'any' || i.isPrivate === (privacy === 'yes'))
       .filter((i) => seeding === 'any' || i.seeding === (seeding === 'yes'))
-      .filter((i) => !q || i.title.toLowerCase().includes(q))
+      // Searching an album by its artist has to work — "dire straits" should
+      // find "Money for Nothing".
+      .filter((i) => !q || `${i.artist || ''} ${i.title}`.toLowerCase().includes(q))
       .sort(SORTS[sort]);
   }, [data, query, type, privacy, seeding, sort]);
 
@@ -271,9 +282,10 @@ function LibraryItems() {
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Select label="Type" value={type} onChange={setType}>
-            <option value="all">Movies &amp; series</option>
+            <option value="all">Everything</option>
             <option value="movie">Movies</option>
             <option value="series">Series</option>
+            <option value="album">Albums</option>
           </Select>
           <Select label="Private tracker" value={privacy} onChange={setPrivacy}>
             <option value="any">Any tracker</option>
@@ -296,7 +308,7 @@ function LibraryItems() {
 
       {items.length === 0 ? (
         <p className="rounded-lg bg-night-900 px-3 py-3 text-sm text-silver">
-          {data?.items?.length ? 'Nothing matches these filters.' : 'No movies or series on disk.'}
+          {data?.items?.length ? 'Nothing matches these filters.' : 'Nothing on disk yet.'}
         </p>
       ) : (
         <div className="space-y-2">

@@ -11,7 +11,11 @@ import { isPortugasTracker } from './portugas.js';
 // event for every import, and its `downloadId` is the torrent's infohash
 // (uppercase). That is the only link we trust.
 
-const IMPORT_EVENT = new Set(['downloadFolderImported', 3, '3']);
+// Radarr/Sonarr call it downloadFolderImported, Lidarr trackFileImported — both
+// are eventType 3, and both carry the torrent infohash in downloadId. (Lidarr
+// also emits downloadImported, 8, once per release: that one has no albumId, so
+// it is not an import record as far as the Library is concerned.)
+const IMPORT_EVENT = new Set(['downloadFolderImported', 'trackFileImported', 3, '3']);
 
 export const normalizeHash = (h) => String(h || '').trim().toLowerCase();
 
@@ -194,7 +198,11 @@ export function summarizeTorrent(t, privacy, { busy = new Set(), owners = new Ma
 
 // --- Normalisation -------------------------------------------------------------
 
-const posterOf = (images) => images?.find((i) => i.coverType === 'poster')?.remoteUrl || null;
+// Radarr/Sonarr call it a poster; Lidarr calls an album's artwork a cover.
+const posterOf = (images) =>
+  images?.find((i) => i.coverType === 'poster' || i.coverType === 'cover')?.remoteUrl || null;
+
+const parentDir = (path) => (path ? path.slice(0, path.lastIndexOf('/')) || null : null);
 
 // "Bluray-1080p" or, for a mixed series, "Bluray-1080p +2" (most common first).
 export function qualitySummary(names) {
@@ -237,6 +245,31 @@ export function normalizeSeries(s, episodeFiles = []) {
     poster: posterOf(s.images),
     fileCount: s.statistics?.episodeFileCount || episodeFiles.length,
     files: episodeFiles.filter((f) => f.path).map((f) => ({ path: f.path, size: f.size || 0 }))
+  };
+}
+
+// An album is the music unit of the Library — the artist is only its container,
+// so deleting one album leaves the rest of the discography alone. Unlike a
+// movie or a series, the on-disk folder isn't carried by the API record, so it
+// is derived from the track files themselves.
+export function normalizeAlbum(a, trackFiles = []) {
+  const files = trackFiles.filter((f) => f.path).map((f) => ({ path: f.path, size: f.size || 0 }));
+  return {
+    key: `album:${a.id}`,
+    id: a.id,
+    type: 'album',
+    title: a.title,
+    artist: a.artist?.artistName || null,
+    year: a.releaseDate ? Number(String(a.releaseDate).slice(0, 4)) || null : null,
+    sizeOnDisk: a.statistics?.sizeOnDisk || 0,
+    path: parentDir(files[0]?.path) || a.artist?.path || null,
+    quality: qualitySummary(trackFiles.map((f) => f.quality?.quality?.name)),
+    added: trackFiles[0]?.dateAdded || a.added || null,
+    poster: posterOf(a.images) || posterOf(a.artist?.images),
+    fileCount: a.statistics?.trackFileCount || files.length,
+    // The delete path removes the files by id, never by path.
+    trackFileIds: trackFiles.map((f) => f.id).filter((id) => id != null),
+    files
   };
 }
 
@@ -357,9 +390,10 @@ export function buildPlan(item, opts) {
       });
     }
   }
+  const ARR_SERVICE = { movie: 'radarr', series: 'sonarr', album: 'lidarr' };
   steps.push({
     kind: 'arr',
-    service: item.type === 'movie' ? 'radarr' : 'sonarr',
+    service: ARR_SERVICE[item.type],
     id: item.id,
     title: item.title,
     deleteFiles: opts.deleteFiles,
@@ -370,7 +404,7 @@ export function buildPlan(item, opts) {
     warnings.push(
       item.hasImports
         ? 'Its torrent is no longer in qBittorrent — only the library side will be removed.'
-        : 'No torrent is linked to this item in the Radarr/Sonarr import history.'
+        : 'No torrent is linked to this item in the *arr import history.'
     );
   }
   if (!opts.deleteTorrent && known.length) {

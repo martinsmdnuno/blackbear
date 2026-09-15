@@ -34,15 +34,34 @@ export const deleteArtist = (id, deleteFiles, addExclusion = false) =>
 
 export const albums = (artistId) => client.get(`/album?artistId=${artistId}`);
 
+// Every album Lidarr knows for the artists in the library, each with its
+// statistics (trackFileCount / sizeOnDisk) — one call, unlike Sonarr where the
+// episode files need a request per series.
+export const allAlbums = () => client.get('/album');
+
 export const album = (id) => client.get(`/album/${id}`);
 
 export const setAlbumsMonitored = (albumIds, monitored) =>
   client.put('/album/monitor', { albumIds, monitored });
 
-// Track files for one album (or the whole library when albumId is omitted) —
-// the Library uses these for on-disk size and hardlink counting.
-export const trackFiles = (albumId) =>
-  client.get(albumId ? `/trackfile?albumId=${albumId}` : '/trackfile');
+// Track files, which the Library uses for on-disk size and hardlink counting.
+// Lidarr refuses an unfiltered /trackfile ("artistId, albumId, trackFileIds or
+// unmapped must be provided"), so one of the two filters is mandatory. Asking
+// per artist is the cheaper sweep: one call covers all of that artist's albums.
+export const trackFilesByArtist = (artistId) => client.get(`/trackfile?artistId=${artistId}`);
+
+export const trackFilesByAlbum = (albumId) => client.get(`/trackfile?albumId=${albumId}`);
+
+// Delete track files from disk without touching the album entity. This is how
+// music deletion differs from movies: an album is metadata hanging off an
+// artist (Lidarr re-adds it on the next refresh), so what we remove are the
+// files — after unmonitoring, or Lidarr grabs the album straight back.
+export const deleteTrackFiles = (trackFileIds) =>
+  client.del('/trackfile/bulk', {
+    body: JSON.stringify({ trackFileIds }),
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 60000
+  });
 
 // Every import record. eventType 3 is trackFileImported, the counterpart of
 // Radarr's downloadFolderImported — its downloadId is the torrent infohash,

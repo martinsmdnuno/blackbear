@@ -44,6 +44,23 @@ describe('item ↔ torrent association', () => {
     assert.equal(index.get(7).size, 2);
   });
 
+  test("an album collects the hashes of Lidarr's per-track import records", () => {
+    // Lidarr names the event trackFileImported and emits one per track, all
+    // pointing at the same torrent. Its own downloadImported (8) record carries
+    // no albumId and must not create a phantom entry.
+    const index = indexImports(
+      [
+        { albumId: 7, downloadId: HASH_A, eventType: 'trackFileImported' },
+        { albumId: 7, downloadId: HASH_A, eventType: 'trackFileImported' },
+        { albumId: 7, downloadId: HASH_B, eventType: 'trackFileImported' },
+        { downloadId: HASH_C, eventType: 'downloadImported' }
+      ],
+      'albumId'
+    );
+    assert.equal(index.size, 1);
+    assert.deepEqual([...index.get(7)], [HASH_A.toLowerCase(), HASH_B.toLowerCase()]);
+  });
+
   test('ignores non-import events and records without a downloadId', () => {
     const index = indexImports(
       [

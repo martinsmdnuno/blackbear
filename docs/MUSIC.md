@@ -55,23 +55,38 @@ FLAC 16/44. Demorou ~7 h por causa do swarm morto, não da configuração.
 
 - [x] **Fase 1 — ligação.** `services/lidarr.js`, entrada no `config.js`, probe em
       Diagnostics, card em Settings, fila do Lidarr em `/api/downloads`.
-- [ ] **Fase 2 — biblioteca de música.** Reutilizar `services/library.js`
-      (`indexImports` com `albumId`, cascade delete, guarda do Portugas).
+- [x] **Fase 2 — biblioteca de música.** Álbuns na Library com associação ao torrent,
+      apagamento em cascata e as mesmas guardas (Portugas, HnR, hardlinks).
 - [ ] **Fase 3 — adicionar música.** Procura de artista/álbum com o *metadata profile*
       exposto na UI (é o que trava a enxurrada de singles e bootlegs).
 - [ ] **Fase 4 — extras.** Wanted/missing, calendário de lançamentos, refresh da
       biblioteca de música no Jellyfin.
 
-### Armadilhas conhecidas para a Fase 2
+### O que a Fase 2 revelou
 
 1. **`eventType` do import — confirmado.** Contra o import real do primeiro álbum:
    `1 → grabbed`, `3 → trackFileImported` (um por faixa), `8 → downloadImported` (um por
    release). A Library quer o **3**, não o 8: só os registos por faixa dizem em que álbum
    o ficheiro aterrou.
-2. **Torrent-discografia.** A unidade natural é o álbum, mas um torrent traz muitas vezes
+   **E era mesmo uma armadilha:** o `IMPORT_EVENT` da Library só conhecia
+   `downloadFolderImported`, por isso descartava silenciosamente *todos* os registos de
+   música — os álbuns apareciam sem torrent nenhum. Corrigido e com teste.
+2. **Apagar música não tem a forma de apagar um filme.** O registo do álbum é metadata
+   pendurada no artista, e o Lidarr recria-o no refresh seguinte a partir do MusicBrainz —
+   apagá-lo seria teatro. O que se apaga são os *track files*, depois de desmonitorizar
+   (senão o Lidarr volta a agarrar o álbum). O artista fica, com o resto da discografia
+   intacta. Por isso também não há "import exclusion" para álbuns: a opção é escondida em
+   vez de aparecer a não fazer nada.
+3. **`/trackfile` recusa pedidos sem filtro** (`artistId`, `albumId`, `trackFileIds` ou
+   `unmapped`). A varredura da Library pergunta uma vez por artista com ficheiros — bem
+   menos chamadas do que uma por álbum.
+
+### Ainda por resolver
+
+1. **Torrent-discografia.** A unidade natural é o álbum, mas um torrent traz muitas vezes
    a discografia inteira — um hash com N donos. O `hashOwners` já modela isto; falta a UI
    dizer em voz alta que apagar um álbum não liberta o torrent.
-3. **Títulos mal formados.** O 1337x devolve `Artista   Álbum` com espaços duplos em vez de
+2. **Títulos mal formados.** O 1337x devolve `Artista   Álbum` com espaços duplos em vez de
    hífens, o que atrapalha o parser do Lidarr. Contar com imports manuais.
 
 ---
