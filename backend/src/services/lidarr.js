@@ -23,6 +23,10 @@ export const addArtist = (payload) => client.post('/artist', payload);
 
 export const allArtists = () => client.get('/artist');
 
+// Used to flip an artist to monitored when a single album is added under it —
+// Lidarr's wanted/missing ignores albums whose artist isn't monitored.
+export const updateArtist = (artist) => client.put(`/artist/${artist.id}`, artist);
+
 export const artist = (id) => client.get(`/artist/${id}`);
 
 // Removing an artist folder full of albums can outlast the default 12s timeout.
@@ -80,6 +84,10 @@ export const removeQueueItem = (id) =>
   client.del(`/queue/${id}?removeFromClient=true&blocklist=true&skipRedownload=false`);
 
 export const searchAlbums = (albumIds) => client.post('/command', { name: 'AlbumSearch', albumIds });
+
+// Whatever Lidarr is doing right now. Adding an artist queues a RefreshArtist
+// that rewrites album monitoring when it lands, so the add flow waits it out.
+export const commands = () => client.get('/command');
 
 // Interactive search — queries every indexer synchronously, so it needs room.
 const RELEASE_TIMEOUT = 90000;
