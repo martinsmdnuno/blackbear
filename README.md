@@ -81,11 +81,12 @@ Ideas for later: [`docs/BACKLOG.md`](docs/BACKLOG.md).
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshot-desktop.png" alt="Blackbear on desktop" width="760" />
+  <img src="docs/screenshot-desktop.png" alt="Blackbear on desktop — picking albums from an artist's discography" width="760" />
 </p>
 <p align="center">
-  <img src="docs/screenshot-mobile.png" alt="Blackbear on mobile" width="260" />
+  <img src="docs/screenshot-mobile.png" alt="Blackbear on mobile — searching an album the way you type it" width="260" />
 </p>
+<p align="center"><sub>Picking Linkin Park albums by cover instead of by title · searching "Radiohead OK Computer" on a phone</sub></p>
 
 ---
 
