@@ -5,7 +5,7 @@ import * as sonarr from '../services/sonarr.js';
 import * as jellyfin from '../services/jellyfin.js';
 import { getAppConfig } from '../config.js';
 import { MIN_RATIO, MIN_SEED_HOURS, isComplete, busyHashes } from '../services/cleanup.js';
-import { isPortugasTracker } from '../services/portugas.js';
+import { isProtectedTorrent } from '../services/portugas.js';
 
 const router = Router();
 
@@ -15,31 +15,6 @@ function hostOf(url) {
   } catch {
     return null;
   }
-}
-
-function magnetTrackerUrls(magnet) {
-  const urls = [];
-  for (const m of String(magnet || '').matchAll(/[?&]tr=([^&]+)/g)) {
-    try {
-      urls.push(decodeURIComponent(m[1]));
-    } catch {
-      // malformed component — skip
-    }
-  }
-  return urls;
-}
-
-// Every announce URL we can find for a torrent. The info row and magnet URI are
-// free; the trackers endpoint is only hit when both give nothing.
-async function announceUrls(t) {
-  const urls = [t.tracker, ...magnetTrackerUrls(t.magnet_uri)].filter(Boolean);
-  if (!urls.length) {
-    const list = await qbit.trackers(t.hash).catch(() => []);
-    for (const tr of list || []) {
-      if (/^(https?|udp):/i.test(tr.url || '')) urls.push(tr.url);
-    }
-  }
-  return urls;
 }
 
 // Classify a torrent as movie or series and, for series, pull out a clean
@@ -98,11 +73,10 @@ async function survey() {
 
   for (const t of torrents) {
     if (!isComplete(t)) continue;
-    const urls = await announceUrls(t);
+    const urls = await qbit.announceUrls(t);
     // Portugas is a private tracker (Hit & Run rules, seeding bonus) — its
-    // torrents are managed by the HnR-safe auto cleanup only, never from here.
-    const isProtected = !urls.length || isPortugasTracker(urls);
-    if (isProtected) {
+    // torrents are never listed here nor removed by the auto cleanup.
+    if (isProtectedTorrent(urls)) {
       protectedCount++;
       continue;
     }

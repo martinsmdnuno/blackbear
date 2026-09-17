@@ -2,6 +2,8 @@ import { getAppConfig } from '../config.js';
 import * as qbit from './qbittorrent.js';
 import * as sonarr from './sonarr.js';
 import * as radarr from './radarr.js';
+import * as lidarr from './lidarr.js';
+import { isProtectedTorrent } from './portugas.js';
 
 let timer = null;
 let lastRun = null;
@@ -17,8 +19,10 @@ export function isComplete(t) {
   return t.progress >= 1 || (t.completed > 0 && t.completed >= t.size);
 }
 
-// Hashes still being handled by Sonarr/Radarr (downloading or importing) — never
-// remove those, or we'd delete a torrent mid-import.
+// Hashes still being handled by Sonarr/Radarr/Lidarr (downloading or importing)
+// — never remove those, or we'd delete a torrent mid-import. Lidarr matters most:
+// music often sits in its queue waiting for a manual import, and deleting the
+// files then loses the download for good.
 export async function busyHashes() {
   const set = new Set();
   const collect = (q) => {
@@ -26,14 +30,23 @@ export async function busyHashes() {
       if (r.downloadId) set.add(String(r.downloadId).toLowerCase());
     }
   };
-  const [s, r] = await Promise.allSettled([sonarr.queue(), radarr.queue()]);
-  if (s.status === 'fulfilled') collect(s.value);
-  if (r.status === 'fulfilled') collect(r.value);
+  const results = await Promise.allSettled([sonarr.queue(), radarr.queue(), lidarr.queue()]);
+  for (const r of results) if (r.status === 'fulfilled') collect(r.value);
   return set;
 }
 
+// Whether the seeding goals are met: the ratio, OR seeded long enough (so a
+// torrent with no peers can't sit there forever). Pure, so the rule is testable.
+export function seedingDone(t, { minRatio, maxSeedSeconds, nowSec }) {
+  const ratioOk = (t.ratio ?? 0) >= minRatio;
+  const seededSec = t.completion_on > 0 ? nowSec - t.completion_on : 0;
+  const timeOk = maxSeedSeconds > 0 && seededSec >= maxSeedSeconds;
+  return ratioOk ? 'ratio' : timeOk ? 'time' : null;
+}
+
 // Remove completed torrents that have seeded to the configured ratio. Opt-in;
-// skips anything the *arr stack is still importing.
+// skips anything the *arr stack is still importing, and never touches a Portugas
+// torrent (or one whose tracker can't be identified) — those only leave by hand.
 export async function runCleanup() {
   const cfg = getAppConfig().cleanup || {};
   if (!cfg.enabled) return { skipped: 'disabled' };
@@ -64,28 +77,34 @@ export async function runCleanup() {
   }
 
   const removed = [];
+  let skippedProtected = 0;
   for (const t of torrents || []) {
     const hash = String(t.hash || '').toLowerCase();
     if (!isComplete(t)) continue;
     if (busy.has(hash)) continue;
 
-    // Remove once it has paid its dues: hit the ratio, OR seeded long enough
-    // (so a torrent with no peers can't sit there forever).
-    const ratioOk = (t.ratio ?? 0) >= minRatio;
-    const seededSec = t.completion_on > 0 ? nowSec - t.completion_on : 0;
-    const timeOk = maxSeedSeconds > 0 && seededSec >= maxSeedSeconds;
-    if (!ratioOk && !timeOk) continue;
+    const reason = seedingDone(t, { minRatio, maxSeedSeconds, nowSec });
+    if (!reason) continue;
+
+    // Checked last: it can cost a trackers request per torrent. If the lookup
+    // fails the URL list is empty, which counts as protected.
+    const urls = await qbit.announceUrls(t).catch(() => []);
+    if (isProtectedTorrent(urls)) {
+      skippedProtected++;
+      continue;
+    }
 
     try {
       await qbit.remove(t.hash, deleteFiles);
-      removed.push({ name: t.name, ratio: t.ratio, reason: ratioOk ? 'ratio' : 'time' });
+      removed.push({ name: t.name, ratio: t.ratio, reason });
     } catch (err) {
       console.error(`[cleanup] failed to remove ${t.name}:`, err.message);
     }
   }
 
   // Re-grab any torrents that have been stalled too long — delete the arr queue
-  // item with blocklist=true so Sonarr/Radarr search for a different release.
+  // item with blocklist=true so Sonarr/Radarr/Lidarr search for a different
+  // release. That removes the torrent too, so Portugas is spared here as well.
   const regrabbed = [];
   if (cfg.reGrabStalled) {
     const stalledMin = Math.max(10, Number(cfg.stalledMinutes) || 60);
@@ -95,14 +114,16 @@ export async function runCleanup() {
       const isStalled = t.state === 'stalledDL' || t.state === 'metaDL';
       const age = nowSec - (t.added_on || 0);
       if (isStalled && age >= stalledSec && (t.progress || 0) < 1) {
-        stuckHashes.add(String(t.hash || '').toLowerCase());
+        const urls = await qbit.announceUrls(t).catch(() => []);
+        if (!isProtectedTorrent(urls)) stuckHashes.add(String(t.hash || '').toLowerCase());
       }
     }
     if (stuckHashes.size) {
-      const [sq, rq] = await Promise.allSettled([sonarr.queue(), radarr.queue()]);
+      const [sq, rq, lq] = await Promise.allSettled([sonarr.queue(), radarr.queue(), lidarr.queue()]);
       const buckets = [
         ['sonarr', sq, sonarr.removeQueueItem],
-        ['radarr', rq, radarr.removeQueueItem]
+        ['radarr', rq, radarr.removeQueueItem],
+        ['lidarr', lq, lidarr.removeQueueItem]
       ];
       for (const [svc, q, remove] of buckets) {
         if (q.status !== 'fulfilled') continue;
@@ -127,6 +148,7 @@ export async function runCleanup() {
     at: new Date().toISOString(),
     removed: removed.length,
     regrabbed: regrabbed.length,
+    skippedProtected,
     ratio: minRatio,
     seedHours: maxSeedSeconds / 3600
   };
