@@ -23,41 +23,60 @@ Lidarr, Prowlarr, Bazarr and qBittorrent — behind one dark, pirate-themed inte
 
 ## ✨ Features
 
-The app, in six areas:
+The app, in five tabs:
 
-1. **Add** — search and add movies (Radarr) and series (Sonarr) with full quality /
-   monitor options. Results show the **IMDb/TMDb rating** and an **"In library"** badge for
-   titles you already have. A **Person** mode searches actors & directors (TMDb) and lists
-   their filmography.
-2. **Trending** — what's hot to grab: **Trending** (this week), **Popular**, **For You**
-   (recommendations from your Radarr/Sonarr history via TMDb), and **Watched** (un-hide).
-   One-tap add, a "hide" button to mark titles seen, and titles already watched in Jellyfin are
-   auto-hidden. Already-owned titles are flagged.
-3. **Upcoming** — monitored titles awaiting release: movies with their digital/physical/
-   cinema dates and series episodes by air date, each with an "in X days" countdown
-   (from the Radarr/Sonarr calendars).
-4. **Downloads** — live state of qBittorrent torrents, Sonarr/Radarr import queues and
-   Bazarr wanted-subtitle counts, auto-refreshing every 5s. Includes a one-tap "Search
-   wanted subtitles" that runs Bazarr's missing-subtitle tasks.
-5. **Library** — every movie and series on disk in one list, biggest first (sort by size or
-   date, filter by type / private tracker / still seeding, search, total space on top). Each
-   title is tied to its torrent(s) through the Radarr/Sonarr import history (never by file
-   name), with an amber **private tracker** badge showing ratio and seed time. Deleting runs a
-   cascade — torrent + its files in qBittorrent first, then the title + files in Radarr/Sonarr —
-   behind a confirmation sheet that shows each step, the space that **really** comes back
-   (hardlinks count once), a second confirmation for private trackers and a typed title below
-   ratio 1.0. Portugas torrents can't be deleted before the Hit & Run floors (ratio 1 or 7 days
-   seeded) — checked on the server. A **Simulation** toggle runs everything as a dry run, and
-   every real delete is logged to `logs/deletions.json`. The **Torrents** view lists finished
-   torrents that have met their seeding goals.
-6. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
-   as "Saved ✓"), test connections, optional **auto-cleanup** (remove a finished torrent once
-   it hits a ratio **or** a max seed time — whichever first — freeing space; skips anything
-   still importing), and inspect
-   health, versions, disk space, indexer status, providers, warnings, container logs/restart.
+1. **Add** — search and add **movies** (Radarr), **series** (Sonarr) and **music** (Lidarr),
+   picking the unit you actually want rather than the whole object:
+   - **Series:** add only *specific seasons*; a series already in the library opens its
+     seasons with what's on disk ("S1 7/7, S2 0/7") and a one-tap **Grab** per season.
+   - **Music → Album:** search the way people type it — *"Pink Floyd The Wall"* — and add
+     just that record. The artist is created underneath with nothing else monitored.
+   - **Music → Artist:** tap an artist to open their **discography** (studio albums first,
+     with covers; filters for EPs, live, compilations and singles) and tick the albums you
+     want — or take the whole discography. Handy when you know the band but not the album
+     title. Artists already in Lidarr show what's on disk and grab straight away.
+   - **Person:** search actors & directors (TMDb) and add from their filmography.
+   - **Grab by link:** paste a **Portugas** torrent link and the app works out the title,
+     adds it to Radarr/Sonarr if needed and sends the torrent — nothing else to fill in.
+
+   Results show IMDb/TMDb ratings and an **"In library"** badge. Quality profiles start
+   from the root folder's defaults, so music lands on the FLAC profile, not "Any".
+2. **Trending** — **Trending** this week, **Recent** (in cinemas / on air) and **For You** (TMDb recommendations
+   seeded from your library). Titles you already own are hidden from Trending and flagged
+   elsewhere; anything watched in **Jellyfin** is hidden automatically.
+3. **Upcoming** — monitored movies, episodes and **albums**, missing ones first, then what's
+   coming with an "in X days" countdown. Each missing item says what's wrong (*Stalled*,
+   *Downloading*, *No sources*) and offers **Search again**, **Renew** a stuck download
+   (blocklist + search for an alternative) or **Pick** a release by hand from every
+   indexer result. Seasons with several missing episodes get one season-pack search.
+4. **Library** — every movie, series and album on disk in one list, biggest first (sort by
+   size or date, filter by type / private tracker / still seeding, search — albums match by
+   artist too, total space on top). Each title is tied to its torrent(s) through the *arr
+   import history (never by file name), with an amber **private tracker** badge showing ratio
+   and seed time. Deleting runs a cascade — torrent + its files in qBittorrent first, then the
+   title + files in Radarr/Sonarr/Lidarr — behind a confirmation sheet that shows each step,
+   the space that **really** comes back (hardlinks count once), a second confirmation for
+   private trackers and a typed title below ratio 1.0. Portugas torrents can't be deleted
+   before the Hit & Run floors (ratio 1 or 7 days seeded) — checked on the server. A
+   **Simulation** toggle runs everything as a dry run, and every real delete is logged to
+   `logs/deletions.json`. The **Torrents** view lists finished torrents that have met their
+   seeding goals.
+5. **Settings & Diagnostics** — configure each service (keys persist in `config.json`, shown
+   as "Saved ✓"), test connections, optional **downloads cleanup** (remove a finished torrent
+   once it hits a ratio **or** a max seed time — whichever first; skips anything still
+   importing), the **Portugas protection** switch, and diagnostics: health, versions, disk
+   space, indexer status, providers, warnings, container logs/restart.
+
+**Portugas guard (Hit & Run).** The Portugas indexer is tagged in Radarr, Sonarr and Lidarr so
+it's only queried for titles carrying that tag. Adding is untagged by default; flip
+"Usar Portugas" on the add sheet for the things you really want from there (Portuguese
+cartoons, Portuguese music).
 
 Mobile-first and installable: open it on your phone and **Add to Home Screen** to run
 it fullscreen like a native app (PWA manifest, no input-focus zoom, no overscroll bounce).
+
+Music module design notes, Lidarr gotchas and what's left: [`docs/MUSIC.md`](docs/MUSIC.md).
+Ideas for later: [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ## Screenshots
 
@@ -82,6 +101,8 @@ it fullscreen like a native app (PWA manifest, no input-focus zoom, no overscrol
                  └────────┬─────────┘
       ┌────────┬────────┬─┴───────┬─────────┬──────────┐
    Sonarr   Radarr   Lidarr   Prowlarr   Bazarr   qBittorrent
+
+   + TMDb, Jellyfin, Lidarr's metadata server and the Cover Art Archive (read-only)
 ```
 
 The **backend is the only thing that holds API keys** — the frontend never sees them.
@@ -211,17 +232,37 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 
 | Method | Path                                          | Purpose                                  |
 |--------|-----------------------------------------------|------------------------------------------|
-| GET    | `/api/search?type=movie\|series&term=...`     | Lookup via Radarr/Sonarr                 |
+| GET    | `/api/search?type=movie\|series\|artist\|album&term=...` | Lookup via Radarr/Sonarr/Lidarr. `album` returns `{ items, artist, artistOnly }` |
 | GET    | `/api/search/person?q=...`                    | Search people (actors/directors) via TMDb|
 | GET    | `/api/search/person/:id`                      | A person's movies + series (filmography) |
-| GET    | `/api/add/quality-profiles?type=movie\|series`| List quality profiles                    |
-| GET    | `/api/add/root-folders?type=movie\|series`    | List root folders                        |
-| POST   | `/api/add`                                    | Add `{ type, item, options }`            |
+| GET    | `/api/add/quality-profiles?type=movie\|series\|artist` | List quality profiles          |
+| GET    | `/api/add/root-folders?type=movie\|series\|artist`     | Root folders, with their default profiles |
+| GET    | `/api/add/metadata-profiles`                  | Lidarr metadata profiles (which release types count) |
+| POST   | `/api/add`                                    | Add `{ type, item, options }` — `type` is `movie`, `series`, `artist` or `album` |
+| POST   | `/api/portugas/grab`                          | Grab by Portugas link `{ url }`          |
 
-`options` (movie): `qualityProfileId`, `rootFolderPath?`, `monitored`, `minimumAvailability`, `searchOnAdd`.
-`options` (series): `qualityProfileId`, `rootFolderPath?`, `monitor`, `seasonFolder`, `seriesType`, `searchOnAdd`.
+`options` (all): `qualityProfileId`, `rootFolderPath?`, `searchOnAdd`, `usePortugas`.
+`options` (movie): `monitored`, `minimumAvailability`.
+`options` (series): `monitor`, `seasons?` (only these season numbers), `seasonFolder`, `seriesType`.
+`options` (artist): `metadataProfileId`, `monitor`, `albums?` (only these MusicBrainz album ids).
+`options` (album): `metadataProfileId`. Adds the artist with nothing monitored, then the album.
+
+Picking albums or seasons waits for Lidarr's/Sonarr's post-add refresh to finish before
+setting monitoring — otherwise the refresh silently reverts it. Albums the metadata profile
+keeps Lidarr from creating come back in `skipped`.
+
+### Series & music
+
+| Method | Path                                    | Purpose                                              |
+|--------|-----------------------------------------|------------------------------------------------------|
+| GET    | `/api/series/:id/seasons`               | Seasons of a library series, with what's on disk     |
+| POST   | `/api/series/:id/seasons/:n`            | `{ monitored?, search? }` for one season             |
+| GET    | `/api/music/artist/:mbid/albums`        | An artist's discography (in the library or not), merged with Lidarr's albums |
+| POST   | `/api/music/artist/:id/albums`          | Library artist: monitor `{ albumIds }` and `search`  |
 
 ### Downloads
+
+Not shown as a tab any more (queue state lives in Upcoming), but still served:
 
 | Method | Path                                            | Purpose                              |
 |--------|-------------------------------------------------|--------------------------------------|
@@ -235,30 +276,35 @@ All endpoints are under `/api`. The frontend uses these; you can also call them 
 
 | Method | Path                                              | Purpose                                          |
 |--------|---------------------------------------------------|--------------------------------------------------|
-| GET    | `/api/pipeline?movieDays=365&episodeDays=90`      | Monitored, not-yet-available movies + episodes from the Radarr/Sonarr calendars, sorted by date |
+| GET    | `/api/pipeline?movieDays=365&episodeDays=90`      | Movies, episodes and albums: missing first (with queue state), then upcoming by date |
+| POST   | `/api/renew/movie\|album\|episode/:id`             | Search the indexers again for one item           |
+| POST   | `/api/renew/season`                               | Season-pack search `{ seriesId, seasonNumber }`  |
+| POST   | `/api/renew/queue/:service/:id`                   | Renew a stuck download: remove + blocklist + search again |
+| GET    | `/api/releases/movie\|album\|episode/:id`          | Every candidate release, for picking by hand     |
+| GET    | `/api/releases/season?seriesId=&seasonNumber=`    | Candidate season packs                           |
+| POST   | `/api/releases/grab`                              | Grab a chosen release `{ service, guid, indexerId }` |
 
 ### Trending
 
 | Method | Path                                  | Purpose                                              |
 |--------|---------------------------------------|------------------------------------------------------|
-| GET    | `/api/trending?mode=trending\|popular`| Trending-this-week or popular movies + series (TMDb) |
+| GET    | `/api/trending?mode=trending\|recent\|popular`| Movies + series from TMDb, minus what's watched in Jellyfin |
 | GET    | `/api/trending/recommended`           | "For You" — TMDb recommendations seeded from your Radarr/Sonarr library |
-| POST   | `/api/trending/seen`                  | Hide an item `{ type, tmdbId }` (persisted)          |
-| DELETE | `/api/trending/seen`                  | Un-hide an item `{ type, tmdbId }`                   |
 
 ### Library
 
 | Method | Path                                       | Purpose                                       |
 |--------|--------------------------------------------|-----------------------------------------------|
-| GET    | `/api/library`                             | Movies + series with files on disk, with torrents, private flag, hardlink state |
-| GET    | `/api/library/ids`                         | Owned TMDb ids (to flag "in library" elsewhere) |
-| POST   | `/api/library/movie\|series/:id/delete`    | Cascade delete (torrent, then *arr). Body below |
+| GET    | `/api/library`                             | Movies, series and albums with files on disk, with torrents, private flag, hardlink state |
+| GET    | `/api/library/ids`                         | Owned TMDb ids + artist MusicBrainz ids (to flag "in library" elsewhere) |
+| POST   | `/api/library/movie\|series\|album/:id/delete` | Cascade delete (torrent, then *arr). Body below |
 | GET    | `/api/seeding`                             | Finished torrents, split into deletable / still seeding |
 | POST   | `/api/seeding/delete`                      | Delete finished torrents `{ hashes }` everywhere |
 
 Delete body: `{ deleteFiles, deleteTorrent, addExclusion, dryRun, confirmTitle }`. `dryRun`
 returns the plan (steps, space freed, guards) without touching anything; a real run returns
-a result per step and stops at the first failure. `409` = refused by a guard (still importing,
+a result per step and stops at the first failure. Deleting an album removes its track files
+and unmonitors it; the artist and the rest of the discography stay. `409` = refused by a guard (still importing,
 Portugas below the Hit & Run floors, or a private torrent under ratio 1 without the typed title).
 
 The backend needs the media disk mounted read-only at the same `/data` path Radarr/Sonarr use
@@ -271,6 +317,9 @@ qBittorrent versions that don't report it themselves.
 | Method | Path                          | Purpose                                              |
 |--------|-------------------------------|------------------------------------------------------|
 | GET    | `/api/jellyfin`               | Continue watching + recently added for the user      |
+
+Jellyfin watch state also hides watched titles in Trending, and deletes trigger a Jellyfin
+library refresh.
 | GET    | `/api/jellyfin/image/:id`     | Poster proxy (Jellyfin is LAN-only; streamed for remote) |
 
 ### Settings
@@ -280,6 +329,8 @@ qBittorrent versions that don't report it themselves.
 | GET    | `/api/settings`       | Current config (secrets masked)                |
 | POST   | `/api/settings`       | Save `{ services: {...} }` (blank secrets kept)|
 | POST   | `/api/settings/test`  | Test a service `{ service }`                   |
+| GET    | `/api/portugas/status`| Is the Portugas indexer tagged in each *arr?   |
+| POST   | `/api/portugas/setup` | Create the tag and scope the indexer to it     |
 
 ### Diagnostics
 
@@ -289,7 +340,7 @@ qBittorrent versions that don't report it themselves.
 | GET    | `/api/diagnostics/logs/:service?tail=`| Docker logs (needs socket)                       |
 | POST   | `/api/diagnostics/restart/:service`   | Restart container (needs socket)                 |
 
-`:service` is one of `sonarr`, `radarr`, `prowlarr`, `bazarr`, `qbittorrent`.
+`:service` is one of `sonarr`, `radarr`, `lidarr`, `prowlarr`, `bazarr`, `qbittorrent`.
 
 ---
 
