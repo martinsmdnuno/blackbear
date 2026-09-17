@@ -4,6 +4,7 @@ import { api } from '../api/client.js';
 import { useToast } from './Toast.jsx';
 import AddSheet from './AddSheet.jsx';
 import SeasonSheet from './SeasonSheet.jsx';
+import ArtistAlbumsSheet from './ArtistAlbumsSheet.jsx';
 import LinkGrab from './LinkGrab.jsx';
 import { truncate, artwork } from '../lib/format.js';
 
@@ -303,6 +304,7 @@ export default function SearchTab() {
   const [musicKind, setMusicKind] = useState('album');
   const [albumHint, setAlbumHint] = useState(null);
   const [seasonsFor, setSeasonsFor] = useState(null);
+  const [albumsFor, setAlbumsFor] = useState(null);
   const [ownedIds, setOwnedIds] = useState({
     movie: new Set(),
     series: new Set(),
@@ -480,22 +482,17 @@ export default function SearchTab() {
         </p>
       )}
 
-      {/* Lidarr can't list a non-library artist's discography, so searching an
-          album by the band's name alone can only match album *titles*. Say so
-          and offer the mode that does what they meant. */}
+      {/* Searching an album by the band's name alone can only match album
+          *titles*. Say so, and offer the band's discography to pick from. */}
       {albumHint && (
         <p className="rounded-lg border border-gold/25 bg-gold/10 px-3 py-2.5 text-xs text-parchment">
           <span className="font-semibold">{albumHint.artistName}</span> is an artist, not an
           album. Add an album title — or{' '}
           <button
-            onClick={() => {
-              setMusicKind('artist');
-              setResults([]);
-              setSearched(false);
-            }}
+            onClick={() => setAlbumsFor(albumHint)}
             className="font-semibold text-gold underline underline-offset-2"
           >
-            search artists instead
+            browse their albums
           </button>
           .
         </p>
@@ -539,10 +536,13 @@ export default function SearchTab() {
                   owned={item.id > 0 || added.has(resultKey(item))}
                   onAdd={() =>
                     // A series already in Sonarr doesn't need adding — what you
-                    // came for is a season it's missing.
+                    // came for is a season it's missing. An artist opens their
+                    // discography, so you can pick records you can't name.
                     searchType === 'series' && item.id > 0
                       ? setSeasonsFor(item)
-                      : setSelected({ type: searchType, item })
+                      : searchType === 'artist'
+                        ? setAlbumsFor(item)
+                        : setSelected({ type: searchType, item })
                   }
                 />
               ))}
@@ -568,11 +568,25 @@ export default function SearchTab() {
 
       {seasonsFor && <SeasonSheet series={seasonsFor} onClose={() => setSeasonsFor(null)} />}
 
+      {albumsFor && (
+        <ArtistAlbumsSheet
+          artist={albumsFor}
+          onClose={() => setAlbumsFor(null)}
+          onAddAlbums={(albums) => setSelected({ type: 'artist', item: albumsFor, albums })}
+          onAddAll={() => setSelected({ type: 'artist', item: albumsFor })}
+        />
+      )}
+
       {selected && (
         <AddSheet
           type={selected.type}
           item={selected.item}
-          onAdded={handleAdded}
+          albums={selected.albums}
+          onAdded={(type, item) => {
+            handleAdded(type, item);
+            // Done with this artist — close their discography too.
+            if (type === 'artist') setAlbumsFor(null);
+          }}
           onClose={() => setSelected(null)}
         />
       )}

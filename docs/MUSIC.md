@@ -113,6 +113,28 @@ flags de monitorização. Marcar antes de eles acabarem é escrever na areia —
 devolve alegremente `monitored: true` para algo que vai ser desmarcado a seguir. A cura é
 a mesma nos dois: esperar pelo comando, escrever, e reler para confirmar.
 
+### Escolher álbuns a partir do artista (2026-09-17)
+
+Procurar um álbum pelo título obriga a lembrar o título. Agora, no modo **Artista**,
+carregar num artista abre a discografia dele — álbuns de estúdio primeiro, com capa e ano,
+e filtros para EPs, ao vivo, coletâneas e singles — e escolhem-se os discos com checkboxes.
+Também dá para adicionar a discografia inteira, como antes. No modo Álbum, escrever só o
+nome da banda oferece "browse their albums".
+
+- **O Lidarr não lista a discografia de um artista que não segue**, mas o servidor de
+  metadados que ele próprio usa (`api.lidarr.audio`, o SkyHook) lista, pelo MBID. O
+  backend vai lá diretamente (`GET /api/music/artist/:mbid/albums`), respeitando o
+  `metadataSource` do Lidarr se estiver alterado. As capas vêm do Cover Art Archive.
+- Os release groups sem nenhum lançamento *Official* são descartados — são bootlegs ao
+  vivo com data no título ("2012-08-11: Jiffy Lube Live") que enterram os discos.
+- **Artista novo**: vai para o painel de adicionar com `options.albums`, e segue o mesmo
+  caminho que um álbum só (artista sem nada monitorizado → esperar pelo refresh →
+  monitorizar só aqueles). Os álbuns que o metadata profile impede o Lidarr de criar são
+  devolvidos em `skipped` e a UI diz quais foram, em vez de falhar tudo.
+- **Artista já na biblioteca**: `POST /api/music/artist/:id/albums` monitoriza e procura
+  logo, sem painel — não há add, por isso não há a corrida do refresh. Álbuns que o Lidarr
+  não criou (fora do metadata profile) aparecem desativados.
+
 ### Ainda por resolver
 
 1. **Torrent-discografia.** A unidade natural é o álbum, mas um torrent traz muitas vezes

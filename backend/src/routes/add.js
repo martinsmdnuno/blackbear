@@ -18,13 +18,13 @@ function serviceFor(type) {
 
 // Adding one album is three steps, not one: Lidarr only knows albums that hang
 // off an artist it already tracks. So make sure the artist exists (with nothing
-// monitored), wait for its discography to land, then monitor just the album
+// monitored), wait for its discography to land, then monitor just the albums
 // asked for. The artist is left monitored on purpose — Lidarr's wanted/missing
-// skips albums whose artist isn't, which would make the album invisible.
-async function addAlbum(item, options, tags, rootFolderPath) {
-  const mbid = item?.artist?.foreignArtistId;
-  if (!mbid || !item?.foreignAlbumId) {
-    throw new Error('That album lookup result carries no MusicBrainz ids');
+// skips albums whose artist isn't, which would make the albums invisible.
+async function addAlbums(artistItem, foreignAlbumIds, options, tags, rootFolderPath) {
+  const mbid = artistItem?.foreignArtistId;
+  if (!mbid || !foreignAlbumIds.length) {
+    throw new Error('That lookup result carries no MusicBrainz ids');
   }
 
   const existing = (await lidarr.allArtists()) || [];
@@ -32,7 +32,7 @@ async function addAlbum(item, options, tags, rootFolderPath) {
 
   if (!artist) {
     const payload = {
-      ...item.artist,
+      ...artistItem,
       qualityProfileId: options.qualityProfileId,
       metadataProfileId: options.metadataProfileId,
       rootFolderPath,
@@ -51,10 +51,17 @@ async function addAlbum(item, options, tags, rootFolderPath) {
   // anything set before it completes is thrown away.
   await waitForRefresh();
 
-  const album = await waitForAlbum(artist.id, item.foreignAlbumId);
-  const settled = await settleMonitoring(artist.id, album.id);
-  if (options.searchOnAdd === true) await lidarr.searchAlbums([album.id]);
-  return { ...settled, artist: { id: artist.id, artistName: artist.artistName } };
+  const { found, missing } = await waitForAlbums(artist.id, foreignAlbumIds);
+  const ids = found.map((a) => a.id);
+  const settled = await settleMonitoring(artist.id, ids);
+  if (options.searchOnAdd === true) await lidarr.searchAlbums(ids);
+  return {
+    albums: settled,
+    // Albums the metadata profile kept Lidarr from creating. Reported, not
+    // thrown: the rest were added and are worth keeping.
+    skipped: missing,
+    artist: { id: artist.id, artistName: artist.artistName }
+  };
 }
 
 // Monitor exactly these seasons and nothing else. Adding a series queues a
@@ -99,43 +106,52 @@ async function waitForCommands(svc, pattern, timeoutMs = 90000) {
 // Block while Lidarr is refreshing artist metadata.
 const waitForRefresh = () => waitForCommands(lidarr, /^(RefreshArtist|RescanFolders)$/i);
 
-// Marking the album monitored once is not enough. Adding an artist queues a
+// Marking an album monitored once is not enough. Adding an artist queues a
 // metadata refresh that runs in the background and rewrites every album's
 // monitored flag from the artist's add options — so a flag set while that is
 // still running is silently reverted, and the API answers "monitored: true"
 // for something Lidarr will unmonitor a second later. Write it, read it back,
 // and keep writing until it holds.
-async function settleMonitoring(artistId, albumId, timeoutMs = 60000) {
+async function settleMonitoring(artistId, albumIds, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
-  let album = null;
   while (Date.now() < deadline) {
     const artist = await lidarr.artist(artistId);
     if (!artist?.monitored) await lidarr.updateArtist({ ...artist, monitored: true });
-    await lidarr.setAlbumsMonitored([albumId], true);
+    await lidarr.setAlbumsMonitored(albumIds, true);
 
     await new Promise((r) => setTimeout(r, 2000));
 
-    const [freshArtist, freshAlbum] = await Promise.all([
+    const [freshArtist, freshAlbums] = await Promise.all([
       lidarr.artist(artistId),
-      lidarr.album(albumId)
+      Promise.all(albumIds.map((id) => lidarr.album(id)))
     ]);
-    album = freshAlbum;
-    if (freshArtist?.monitored && freshAlbum?.monitored) return freshAlbum;
+    if (freshArtist?.monitored && freshAlbums.every((a) => a?.monitored)) return freshAlbums;
   }
   throw new Error(
-    'Lidarr kept resetting the monitoring for this album — its metadata refresh may still be running. Try again in a minute.'
+    'Lidarr kept resetting the monitoring for these albums — its metadata refresh may still be running. Try again in a minute.'
   );
 }
 
 // A freshly added artist has no albums until Lidarr finishes pulling its
-// metadata, which takes a few seconds.
-async function waitForAlbum(artistId, foreignAlbumId, timeoutMs = 45000) {
+// metadata, which takes a few seconds. Returns as soon as every album asked for
+// is there; after that, whatever is still absent once the list has stopped
+// growing for a few polls is not coming.
+async function waitForAlbums(artistId, foreignAlbumIds, timeoutMs = 45000) {
   const deadline = Date.now() + timeoutMs;
   let albums = [];
+  let lastCount = -1;
+  let stablePolls = 0;
   while (Date.now() < deadline) {
     albums = (await lidarr.albums(artistId)) || [];
-    const hit = albums.find((a) => a.foreignAlbumId === foreignAlbumId);
-    if (hit) return hit;
+    const byId = new Map(albums.map((a) => [a.foreignAlbumId, a]));
+    const found = foreignAlbumIds.map((id) => byId.get(id)).filter(Boolean);
+    if (found.length === foreignAlbumIds.length) return { found, missing: [] };
+
+    stablePolls = albums.length > 0 && albums.length === lastCount ? stablePolls + 1 : 0;
+    lastCount = albums.length;
+    if (found.length && stablePolls >= 3) {
+      return { found, missing: foreignAlbumIds.filter((id) => !byId.has(id)) };
+    }
     await new Promise((r) => setTimeout(r, 1500));
   }
   // The usual cause isn't slowness: the metadata profile filters the album out
@@ -143,7 +159,7 @@ async function waitForAlbum(artistId, foreignAlbumId, timeoutMs = 45000) {
   // creates it. Say that, rather than "timed out".
   throw new Error(
     albums.length
-      ? 'Lidarr never listed that album for the artist — the metadata profile probably excludes it (compilations, live and singles are filtered out by Standard). Pick a wider profile and try again.'
+      ? `Lidarr never listed ${foreignAlbumIds.length > 1 ? 'those albums' : 'that album'} for the artist — the metadata profile probably excludes ${foreignAlbumIds.length > 1 ? 'them' : 'it'} (compilations, live and singles are filtered out by Standard). Pick a wider profile and try again.`
       : 'Lidarr is still pulling this artist\'s discography — try again in a moment.'
   );
 }
@@ -237,13 +253,25 @@ router.post('/', async (req, res) => {
       if (!options.metadataProfileId) {
         return res.status(400).json({ error: 'metadataProfileId is required for albums' });
       }
-      const added = await addAlbum(item, options, tags, rootFolderPath);
-      return res.status(201).json(added);
+      const { albums, skipped, artist } = await addAlbums(
+        item.artist,
+        [item.foreignAlbumId].filter(Boolean),
+        options,
+        tags,
+        rootFolderPath
+      );
+      return res.status(201).json({ ...albums[0], skipped, artist });
     }
 
     if (type === 'artist') {
       if (!options.metadataProfileId) {
         return res.status(400).json({ error: 'metadataProfileId is required for artists' });
+      }
+      // Picked from the artist's discography: add the artist with nothing
+      // monitored, then just these albums — the same path as a single album.
+      if (Array.isArray(options.albums) && options.albums.length) {
+        const added = await addAlbums(item, options.albums.map(String), options, tags, rootFolderPath);
+        return res.status(201).json(added);
       }
       const payload = {
         ...item,
