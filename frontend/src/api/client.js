@@ -35,6 +35,14 @@ export const api = {
   // Lidarr only: decides whether an artist brings in albums, or albums plus
   // every single, live bootleg and remix compilation.
   metadataProfiles: () => req('/add/metadata-profiles'),
+  // An artist's whole discography, in the library or not — to pick albums from.
+  artistAlbums: (mbid) => req(`/music/artist/${mbid}/albums`, { timeout: 30000 }),
+  // Artist already in Lidarr: monitor these albums and search for them.
+  grabArtistAlbums: (artistId, albumIds) =>
+    req(`/music/artist/${artistId}/albums`, {
+      method: 'POST',
+      body: JSON.stringify({ albumIds, search: true })
+    }),
   add: (payload) => req('/add', { method: 'POST', body: JSON.stringify(payload) }),
 
   pipeline: () => req('/pipeline'),

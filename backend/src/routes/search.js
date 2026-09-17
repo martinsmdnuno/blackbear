@@ -50,12 +50,14 @@ async function albumSearch(term) {
     fullTerm: term
   });
 
-  // Searching an album by an artist's name alone leaves no title to match, and
-  // Lidarr offers no way to list a non-library artist's discography — so say so
-  // instead of returning whatever happens to have their name in the title.
+  // Searching an album by an artist's name alone leaves no title to match — so
+  // say so, and let the UI offer the artist's discography instead of whatever
+  // happens to have their name in the title.
   return {
     items,
-    artist: artist ? { artistName: artist.artistName, foreignArtistId: artist.foreignArtistId } : null,
+    // The whole lookup result, so the UI can open this artist's discography
+    // and add them from it.
+    artist: artist || null,
     artistOnly: Boolean(artist) && !termTitle
   };
 }

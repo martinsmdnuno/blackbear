@@ -74,7 +74,7 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
-export default function AddSheet({ type, item, onClose, onAdded }) {
+export default function AddSheet({ type, item, albums, onClose, onAdded }) {
   const toast = useToast();
   const isMovie = type === 'movie';
   const isArtist = type === 'artist';
@@ -82,6 +82,9 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
   // Both music types need Lidarr's profile lists; an album also creates the
   // artist behind it, so it asks for the same two profiles.
   const isMusic = isArtist || isAlbum;
+  // Albums picked from the artist's discography: the artist goes in with only
+  // these monitored.
+  const pickedAlbums = isArtist && albums?.length ? albums : null;
   const title = item.title || item.artistName;
 
   const [profiles, setProfiles] = useState([]);
@@ -162,9 +165,22 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
         setSubmitting(false);
         return;
       }
-      await api.add({ type, item, options });
+      if (pickedAlbums) options.albums = pickedAlbums.map((a) => a.foreignAlbumId);
+      const result = await api.add({ type, item, options });
       const where = isMovie ? 'Radarr' : isMusic ? 'Lidarr' : 'Sonarr';
-      toast.success(`${title} added to ${where}`);
+      if (pickedAlbums) {
+        const skipped = new Set(result?.skipped || []);
+        const kept = pickedAlbums.length - skipped.size;
+        toast.success(`${kept} album${kept === 1 ? '' : 's'} by ${title} added to ${where}`);
+        if (skipped.size) {
+          const names = pickedAlbums.filter((a) => skipped.has(a.foreignAlbumId)).map((a) => a.title);
+          toast.error(
+            `Lidarr skipped ${names.join(', ')} — the metadata profile excludes ${names.length > 1 ? 'them' : 'it'}. Pick a wider profile to get ${names.length > 1 ? 'them' : 'it'}.`
+          );
+        }
+      } else {
+        toast.success(`${title} added to ${where}`);
+      }
       onAdded?.(type, item);
       onClose();
     } catch (err) {
@@ -262,12 +278,23 @@ export default function AddSheet({ type, item, onClose, onAdded }) {
                     ))}
                   </select>
                   <span className="mt-1 block text-xs text-silver">
-                    {isAlbum
-                      ? 'Used for the artist this album hangs off. If it excludes the album — Standard drops compilations and live records — Lidarr never creates it.'
+                    {isAlbum || pickedAlbums
+                      ? 'Used for the artist these albums hang off. If it excludes the album — Standard drops compilations and live records — Lidarr never creates it.'
                       : 'What counts as part of the discography. A permissive one drags in every single, live bootleg and remix compilation the artist ever touched.'}
                   </span>
                 </Field>
-                {isAlbum ? (
+                {pickedAlbums ? (
+                  <div className="rounded-lg bg-night-900 px-3 py-2.5 text-xs text-silver">
+                    <p className="mb-1 text-parchment">
+                      {pickedAlbums.length === 1
+                        ? 'Only this album is monitored:'
+                        : `Only these ${pickedAlbums.length} albums are monitored:`}
+                    </p>
+                    <p className="line-clamp-3 text-gold-light">
+                      {pickedAlbums.map((a) => a.title).join(' · ')}
+                    </p>
+                  </div>
+                ) : isAlbum ? (
                   <p className="rounded-lg bg-night-900 px-3 py-2.5 text-xs text-silver">
                     Only this album is monitored. The artist is added alongside it — the rest of
                     the discography stays untouched.
