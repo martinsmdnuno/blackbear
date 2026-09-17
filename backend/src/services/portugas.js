@@ -35,6 +35,12 @@ const matchesPortugas = (name) => (name || '').toLowerCase().includes(INDEXER_MA
 // protection can't drift between them.
 export const isPortugasTracker = (urls) => (urls || []).some((u) => matchesPortugas(u));
 
+// Torrents nothing automatic may ever delete: Portugas ones, and any whose
+// tracker can't be identified — never guess that a torrent is safe to remove.
+// Portugas torrents only ever leave by hand, from the Library, behind its HnR
+// floors.
+export const isProtectedTorrent = (urls) => !(urls || []).length || isPortugasTracker(urls);
+
 async function findTag(svc) {
   const all = await svc.tags();
   return (all || []).find((t) => (t.label || '').toLowerCase() === TAG_LABEL) || null;

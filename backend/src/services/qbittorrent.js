@@ -127,7 +127,33 @@ export const remove = (hashes, deleteFiles = false) =>
 
 export const trackers = (hash) => callJson(`/api/v2/torrents/trackers?hash=${hash}`);
 
+function magnetTrackerUrls(magnet) {
+  const urls = [];
+  for (const m of String(magnet || '').matchAll(/[?&]tr=([^&]+)/g)) {
+    try {
+      urls.push(decodeURIComponent(m[1]));
+    } catch {
+      // malformed component — skip
+    }
+  }
+  return urls;
+}
+
+// Every announce URL we can find for a torrent. The info row and magnet URI are
+// free; the trackers endpoint is only hit when both give nothing. Shared by the
+// Torrents view and the auto cleanup, so both identify Portugas the same way.
+export async function announceUrls(t) {
+  const urls = [t.tracker, ...magnetTrackerUrls(t.magnet_uri)].filter(Boolean);
+  if (!urls.length) {
+    const list = await trackers(t.hash).catch(() => []);
+    for (const tr of list || []) {
+      if (/^(https?|udp):/i.test(tr.url || '')) urls.push(tr.url);
+    }
+  }
+  return urls;
+}
+
 // Generic torrent properties; carries `is_private` on qBittorrent 4.5+.
 export const properties = (hash) => callJson(`/api/v2/torrents/properties?hash=${hash}`);
 
-export default { version, listTorrents, pause, resume, remove, trackers, properties };
+export default { version, listTorrents, pause, resume, remove, trackers, properties, announceUrls };

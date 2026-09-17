@@ -242,8 +242,16 @@ function CleanupCard({ value, onChange }) {
         When on, a finished torrent is removed once it hits the ratio <em>or</em> has seeded for
         the hours below (whichever comes first — so a torrent with no peers can't seed forever) —
         and its files deleted to free space (safe with hardlinks: your library stays intact).
-        Torrents Sonarr/Radarr are still importing are skipped.
+        Torrents Sonarr/Radarr/Lidarr are still importing are skipped.
       </p>
+      <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+        <ShieldCheck size={16} className="mt-0.5 shrink-0 text-emerald-400" />
+        <p className="text-xs text-emerald-200/90">
+          <span className="font-semibold">Portugas nunca é apagado automaticamente.</span> Nem
+          pela limpeza, nem pelo re-grab de torrents parados — e o mesmo vale para torrents cujo
+          tracker não se consegue identificar. Esses só saem à mão, na Library.
+        </p>
+      </div>
       <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
         <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
         <p className="text-xs text-amber-200/90">
