@@ -54,6 +54,18 @@ export const deleteEpisodeFile = (id) => client.del(`/episodefile/${id}`);
 export const queue = () =>
   client.get('/queue?includeUnknownSeriesItems=true&pageSize=100');
 
+// What Sonarr's Manual Import screen would show for one download (torrent hash):
+// one item per file, with the series/episodes/quality it parsed and any rejections.
+export const manualImportCandidates = (downloadId) =>
+  client.get(`/manualimport?downloadId=${encodeURIComponent(downloadId)}&filterExistingFiles=true`, {
+    timeout: 60000
+  });
+
+// Run the ManualImport command for the given files. importMode 'auto' lets Sonarr
+// pick hardlink/copy for a completed download, so the torrent keeps seeding.
+export const manualImport = (files, importMode = 'auto') =>
+  client.post('/command', { name: 'ManualImport', files, importMode });
+
 // Remove a queue item, blocklisting the release so Sonarr grabs a different one.
 export const removeQueueItem = (id) =>
   client.del(`/queue/${id}?removeFromClient=true&blocklist=true&skipRedownload=false`);

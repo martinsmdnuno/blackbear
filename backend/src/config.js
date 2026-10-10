@@ -65,6 +65,14 @@ function defaultConfig() {
         stalledMinutes: 60, // a torrent stalled for at least this long is considered stuck
         intervalSeconds: 120
       },
+      // Finish imports Radarr/Sonarr block only because a pushed release was
+      // matched to the library by ID (see services/autoImport.js). On by default:
+      // it imports (hardlink), never deletes.
+      autoImport: {
+        enabled: true,
+        dryRun: false, // log what would be imported without doing it
+        intervalSeconds: 300
+      },
       library: {
         // Tracker hostnames treated as private when qBittorrent can't say itself
         // (no `private` field / `is_private` property). Also read live from

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getConfig, saveConfig } from '../config.js';
 import { probeService, SERVICE_NAMES } from '../services/probe.js';
 import { startCleanupLoop } from '../services/cleanup.js';
+import { startAutoImportLoop } from '../services/autoImport.js';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.post('/', (req, res) => {
   const updated = saveConfig(update);
   // Re-arm the cleanup loop if its settings changed.
   if (update.app?.cleanup) startCleanupLoop();
+  if (update.app?.autoImport) startAutoImportLoop();
   res.json(sanitize(updated));
 });
 
