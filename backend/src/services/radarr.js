@@ -27,6 +27,18 @@ export const deleteMovie = (id, deleteFiles, addExclusion = false) =>
 
 export const queue = () => client.get('/queue?pageSize=100');
 
+// What Radarr's Manual Import screen would show for one download (torrent hash):
+// one item per file, with the movie/quality/language it parsed and any rejections.
+export const manualImportCandidates = (downloadId) =>
+  client.get(`/manualimport?downloadId=${encodeURIComponent(downloadId)}&filterExistingFiles=true`, {
+    timeout: 60000
+  });
+
+// Run the ManualImport command for the given files. importMode 'auto' lets Radarr
+// pick hardlink/copy for a completed download, so the torrent keeps seeding.
+export const manualImport = (files, importMode = 'auto') =>
+  client.post('/command', { name: 'ManualImport', files, importMode });
+
 // Everything Radarr recorded for one download client id (torrent hash) — used
 // to map a seeded torrent back to the movie it was imported as.
 export const historyForDownload = (downloadId) =>
