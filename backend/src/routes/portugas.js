@@ -35,6 +35,24 @@ async function lookupItem(meta) {
 // we fall through — which is correct, it has nothing to reject on.
 const ANY_LANGUAGE_ID = -1;
 
+// Radarr's language rejection reads "<wanted> is wanted, but found <found>".
+const LANGUAGE_REJECTION = /is wanted, but found (\w+)/i;
+
+// A hand-picked release isn't always Portuguese (e.g. a Spanish film in its
+// original audio). When the profile refuses it on language alone, pick the
+// profile that fits the language actually found: Portuguese → the Portuguese
+// profile, anything else → one that accepts any language, that language, or
+// the film's original language.
+function profileForLanguage(profiles, found) {
+  const language = (p) => p?.language;
+  if (/^portuguese/i.test(found)) return profileForPortugas(profiles);
+  return (
+    profiles.find((p) => language(p)?.id === ANY_LANGUAGE_ID) ||
+    profiles.find((p) => (language(p)?.name || '').toLowerCase() === found.toLowerCase()) ||
+    profiles.find((p) => /^original/i.test(language(p)?.name || ''))
+  );
+}
+
 function profileForPortugas(profiles) {
   const language = (p) => p?.language;
   return (
@@ -102,14 +120,38 @@ router.post('/grab', async (req, res) => {
     if (!item) throw new Error(`${label} não encontrou "${meta.name}" na base de dados`);
 
     const added = await ensureInLibrary(svc, serviceName, type, item);
-    const result = await svc.pushRelease({
+    const push = () => svc.pushRelease({
       title: meta.name,
       protocol: 'torrent',
       publishDate: new Date().toISOString(),
       guid: meta.downloadUrl,
-      downloadUrl: meta.downloadUrl
+      downloadUrl: meta.downloadUrl,
+      // The release name often differs from the library title (e.g. "Animals"
+      // vs the original "Animales"), and a title-only match then fails with
+      // "Unknown Movie". Passing the ids lets the *arr match on them instead.
+      ...(meta.isSeries
+        ? { tvdbId: meta.tvdbId || undefined }
+        : {
+            tmdbId: meta.tmdbId || undefined,
+            imdbId: Number(String(meta.imdbId).replace(/\D/g, '')) || undefined
+          })
     });
-    const rel = Array.isArray(result) ? result[0] : result;
+    const first = (r) => (Array.isArray(r) ? r[0] : r);
+    let rel = first(await push());
+
+    // Refused only because the profile wants another language? The user chose
+    // this exact release, so move the movie to a profile that accepts the
+    // language found and push once more.
+    const languageHit = !meta.isSeries &&
+      rejectionReasons(rel).map((r) => r.match(LANGUAGE_REJECTION)).find(Boolean);
+    if (languageHit && added?.id) {
+      const profile = profileForLanguage(await radarr.qualityProfiles(), languageHit[1]);
+      if (profile && profile.id !== added.qualityProfileId) {
+        const movie = await radarr.movie(added.id);
+        await radarr.updateMovie({ ...movie, qualityProfileId: profile.id });
+        rel = first(await push());
+      }
+    }
     if (rel && (rel.rejected || rejectionReasons(rel).length)) {
       const reasons = rejectionReasons(rel);
       return res.status(422).json({
