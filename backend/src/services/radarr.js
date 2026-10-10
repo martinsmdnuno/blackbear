@@ -11,6 +11,8 @@ export const rootFolders = () => client.get('/rootfolder');
 
 export const addMovie = (payload) => client.post('/movie', payload);
 
+export const updateMovie = (movie) => client.put(`/movie/${movie.id}`, movie);
+
 export const allMovies = () => client.get('/movie');
 
 export const movie = (id) => client.get(`/movie/${id}`);
